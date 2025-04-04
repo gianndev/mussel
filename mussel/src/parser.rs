@@ -27,6 +27,7 @@ where
 #[derive(Debug)]
 pub enum Atom {
     String(String), // Represents an owned string within the 'Atom::String' variant.
+    Name(String),
 }
 
 // Implements the 'Display' trait for the 'Atom' enum.
@@ -35,8 +36,8 @@ impl std::fmt::Display for Atom {
     // Defines how 'Atom' is displayed as a formatted string.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Atom::String(string) => write!(f, "{string}"), 
-            // Formats the Atom::String variant by directly printing its inner string value.
+            Atom::String(string) => write!(f, "{string}"), // Formats the Atom::String variant by directly printing its inner string value.
+            Atom::Name(string) => write!(f, "{string}"),
         }
     }
 }
@@ -48,6 +49,15 @@ pub fn parse_string(input: &str) -> IResult<&str, Atom> {
     
     map(parser, |string: &str| Atom::String(string.to_string()))(input)
     // Transforms the parsed string into an Atom::String variant.
+}
+
+// Defines a parser for quoted strings.
+pub fn parse_name(input: &str) -> IResult<&str, Atom> {
+    map(alpha1, |string: &str| Atom::Name(string.to_string()))(input)
+}
+
+pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
+    alt((parse_string, parse_name))(input)
 }
 
 // Defines an enumeration 'Expr' to represent expressions like variable declarations or function calls.
@@ -64,7 +74,7 @@ pub fn parse_call(input: &str) -> IResult<&str, Expr> {
     let parse_name = alpha1; 
 
     // Matches the argument enclosed in parentheses (e.g., (argument)).
-    let parse_arg = delimited(tag("("), parse_string, tag(")"));
+    let parse_arg = delimited(tag("("), parse_atom, tag(")"));
 
     // Combines the function name and argument into a tuple.
     let parser = tuple((parse_name, parse_arg));
@@ -79,7 +89,7 @@ pub fn parse_let(input: &str) -> IResult<&str, Expr> {
     let parse_name = preceded(tag("let"), ws(alpha1));
 
     // Matches the equals sign and parses the value after it, allowing whitespace.
-    let parse_equals = preceded(tag("="), ws(parse_string));
+    let parse_equals = preceded(tag("="), ws(parse_atom));
 
     // Combines the variable name and value into a tuple.
     let parser = tuple((parse_name, parse_equals));
