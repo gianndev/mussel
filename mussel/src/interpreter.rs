@@ -4,11 +4,28 @@ use std::collections::HashMap;
 // Declares the 'interpreter' function, which takes an expression ('Expr') as input.
 pub fn interpreter(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
     match expr {
-        Expr::Call(name, arg) => {
+        Expr::Call(name, args) => {
             if name == "println" {
-                println!("{arg:?}");
+                for arg in args {
+                    let arg = interpreter(arg, context);
+                    print!("{arg:?}");
+                }
+            } else {
+                match context.get(&name) {
+                    Some(Expr::Closure(parameters, body)) => {
+                        let mut scope = context.clone();
+                        for (parameter, arg) in parameters.into_iter().zip(args.into_iter()) {
+                            let expr = interpreter(arg, &mut scope);
+                            scope.insert(parameter.clone(), expr);
+                        }
+                        for expr in body {
+                            interpreter(expr.clone(), &mut scope);
+                        }
+                    }
+                    _ => panic!("Function '{name}' doesn't exist"),
+                }
             }
-            Expr::Void  // This branch returns an Expr
+            Expr::Void
         },
         Expr::Let(name, value) => {
             context.insert(name, *value);
@@ -18,6 +35,6 @@ pub fn interpreter(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             Atom::Name(name) => context.get(name).unwrap().clone(),
             _ => expr,  // Return the original expression
         },
-        Expr::Void => expr,  // Handle the Void case explicitly
+        Expr::Void | Expr::Closure(_, _) => expr,
     }
 }

@@ -1,2 +1,2 @@
-let name = "Mussel"
-println(name)
+let printer = |name| println(name)
+printer("Hello")
