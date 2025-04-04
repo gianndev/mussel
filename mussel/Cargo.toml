@@ -4,6 +4,10 @@ version = "0.0.1"
 authors = ["Francesco Giannice"]
 edition = "2024"
 
+[profile.release]
+lto = true
+strip = true
+
 [dependencies]
 nom = "7.1"
 nom-supreme = "0.8"

@@ -8,7 +8,7 @@ use nom::{
     sequence::{delimited, pair, preceded, separated_pair, tuple},
 };
 use nom_supreme::{error::ErrorTree, final_parser::final_parser, tag::complete::tag, ParserExt};
-use std::{collections::HashMap, fmt};
+use std::fmt;
 
 type Span<'a> = &'a str;
 type IResult<'a, O> = nom::IResult<Span<'a>, O, ErrorTree<Span<'a>>>;
