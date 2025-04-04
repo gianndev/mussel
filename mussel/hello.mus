@@ -1,2 +1,5 @@
-let printer = |name| println(name)
-printer("Hello")
+fn printer(name) {
+    println("Hello", name)
+    println("This is cool!")
+}
+printer("Francesco")
