@@ -1,5 +1,5 @@
 use crate::parser::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, env::Args};
 
 // Declares the 'interpreter' function, which takes an expression ('Expr') as input.
 pub fn interpreter(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
@@ -36,5 +36,9 @@ pub fn interpreter(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             _ => expr,  // Return the original expression
         },
         Expr::Void | Expr::Closure(_, _) => expr,
+        Expr::Function(name, args, body) => {
+            context.insert(name, Expr::Closure(args, body));
+            Expr::Void
+        }
     }
 }

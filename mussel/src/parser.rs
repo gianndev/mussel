@@ -45,12 +45,12 @@ pub fn parse_string(input: &str) -> IResult<&str, Atom> {
 }
 
 // Defines a parser for quoted strings.
-pub fn parse_name(input: &str) -> IResult<&str, Atom> {
+pub fn parse_variable(input: &str) -> IResult<&str, Atom> {
     map(alpha1, |string: &str| Atom::Name(string.to_string()))(input)
 }
 
 pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
-    alt((parse_string, parse_name))(input)
+    alt((parse_string, parse_variable))(input)
 }
 
 // Defines an enumeration 'Expr' to represent expressions like variable declarations or function calls.
@@ -62,6 +62,7 @@ pub enum Expr {
     Let(String, Box<Expr>),
     Constant(Atom),
     Closure(Vec<String>, Vec<Expr>),
+    Function(String, Vec<String>, Vec<Expr>), // A function has a name (string), arguments and the content
 }
 
 // Defines a parser for function calls with arguments.
@@ -105,10 +106,21 @@ pub fn parse_constant(input: &str) -> IResult<&str, Expr> {
     map(parse_atom, Expr::Constant)(input)
 }
 
+pub fn parse_name(input: &str) -> IResult<&str, String> {
+    map(alpha1, String::from)(input)
+}
+
+pub fn parse_function(input: &str) -> IResult<&str, Expr> {
+    let parse_args = delimited(tag("("), separated_list0(tag(","), ws(parse_name)), tag(")"));
+    let parse_body = delimited(tag("{"), ws(many0(parse_expr)), tag("}"));
+    let parser = preceded(tag("fn"), tuple((ws(parse_name), parse_args, ws(parse_body))));
+    map(parser, |(name, args, body)| Expr::Function(name, args, body))(input)
+}
+
 // Defines a parser for multiple expressions, which can include both 'let' declarations and function calls.
 pub fn parse_expr(input: &str) -> IResult<&str, Expr> {
     // Parses zero or more expressions (both 'let' and function calls), allowing whitespace between them.
-    alt((parse_let, parse_call, parse_constant, parse_closure))(input)
+    alt((parse_function, parse_closure, parse_call, parse_let, parse_constant))(input)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Expr>> {
