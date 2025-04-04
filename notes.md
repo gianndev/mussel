@@ -7,3 +7,7 @@
 3. Interpret/Compile AST
 
 *Probably Mussel is going to be an interpreted language*
+
+## Nom
+
+'Nom' is a parser combinator library which makes it possible to combine different parsers.
