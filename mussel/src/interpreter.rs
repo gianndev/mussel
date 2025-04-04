@@ -1,23 +1,23 @@
 use crate::parser::*;
-use std::collections::{btree_map::Values, HashMap};
+use std::collections::HashMap;
 
 // Declares the 'interpreter' function, which takes an expression ('Expr') as input.
-pub fn interpreter(expr: Expr, context: &mut HashMap<String, Atom>) {
-    // Matches the expression to identify its variant.
+pub fn interpreter(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
     match expr {
-        // Handles the 'Call' variant, extracting the function name and its argument.
         Expr::Call(name, arg) => {
-            
-            // Checks if the function name is "println", which is used for printing output.
             if name == "println" {
-                
-                // Prints the argument using its Display implementation.
-                // This ensures the argument is displayed in a user-friendly format.
-                println!("{arg}");
+                println!("{arg:?}");
             }
+            Expr::Void  // This branch returns an Expr
         },
         Expr::Let(name, value) => {
-            context.insert(name, value);
-        }
+            context.insert(name, *value);
+            Expr::Void // Return a default value after side-effect
+        },
+        Expr::Constant(ref atom) => match atom {
+            Atom::Name(name) => context.get(name.as_str()).unwrap().clone(),
+            _ => expr,  // Return the original expression
+        },
+        Expr::Void => Expr::Void,  // Handle the Void case explicitly
     }
 }

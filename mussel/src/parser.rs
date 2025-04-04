@@ -24,7 +24,7 @@ where
 
 // Defines an enumeration 'Atom' to represent fundamental values.
 // The #[derive(Debug)] attribute allows Atom to be printed for debugging purposes.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Atom {
     String(String), // Represents an owned string within the 'Atom::String' variant.
     Name(String),
@@ -62,10 +62,12 @@ pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
 
 // Defines an enumeration 'Expr' to represent expressions like variable declarations or function calls.
 // The #[derive(Debug)] attribute allows Expr to be printed for debugging purposes.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
-    Let(String, Atom), // Represents a variable declaration with a name and a value.
-    Call(String, Atom), // Represents a function call with a name and an argument.
+    Void, // To return nothing
+    Call(String, Box<Expr>),
+    Let(String, Box<Expr>),
+    Constant(Atom),
 }
 
 // Defines a parser for function calls with arguments.
@@ -74,13 +76,13 @@ pub fn parse_call(input: &str) -> IResult<&str, Expr> {
     let parse_name = alpha1; 
 
     // Matches the argument enclosed in parentheses (e.g., (argument)).
-    let parse_arg = delimited(tag("("), parse_atom, tag(")"));
+    let parse_arg = delimited(tag("("), parse_expr, tag(")"));
 
     // Combines the function name and argument into a tuple.
     let parser = tuple((parse_name, parse_arg));
 
     // Transforms the parsed tuple into an Expr::Call variant with owned values.
-    map(parser, |(name, arg)| Expr::Call(name.to_string(), arg))(input)
+    map(parser, |(name, arg)| Expr::Call(name.to_string(), Box::new(arg)))(input)
 }
 
 // Defines a parser for variable declarations using the 'let' keyword.
@@ -89,17 +91,25 @@ pub fn parse_let(input: &str) -> IResult<&str, Expr> {
     let parse_name = preceded(tag("let"), ws(alpha1));
 
     // Matches the equals sign and parses the value after it, allowing whitespace.
-    let parse_equals = preceded(tag("="), ws(parse_atom));
+    let parse_equals = preceded(tag("="), ws(parse_expr));
 
     // Combines the variable name and value into a tuple.
     let parser = tuple((parse_name, parse_equals));
 
     // Transforms the parsed tuple into an Expr::Let variant with owned values.
-    map(parser, |(name, value)| Expr::Let(name.to_string(), value))(input)
+    map(parser, |(name, value)| Expr::Let(name.to_string(), Box::new(value)))(input)
+}
+
+pub fn parse_constant(input: &str) -> IResult<&str, Expr> {
+    map(parse_atom, Expr::Constant)(input)
 }
 
 // Defines a parser for multiple expressions, which can include both 'let' declarations and function calls.
-pub fn parse_expr(input: &str) -> IResult<&str, Vec<Expr>> {
+pub fn parse_expr(input: &str) -> IResult<&str, Expr> {
     // Parses zero or more expressions (both 'let' and function calls), allowing whitespace between them.
-    many0(ws(alt((parse_let, parse_call))))(input)
+    alt((parse_let, parse_call, parse_constant))(input)
+}
+
+pub fn parser(input: &str) -> IResult<&str, Vec<Expr>> {
+    many0(ws(parse_expr))(input)
 }
