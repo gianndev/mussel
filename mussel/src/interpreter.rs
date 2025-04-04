@@ -8,8 +8,9 @@ pub fn interpreter(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             if name == "println" {
                 for arg in args {
                     let arg = interpreter(arg, context);
-                    print!("{arg:?}");
+                    print!("{arg}");
                 }
+                println!();
             } else {
                 match context.get(&name) {
                     Some(Expr::Closure(parameters, body)) => {

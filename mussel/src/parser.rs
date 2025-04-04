@@ -65,6 +65,15 @@ pub enum Expr {
     Function(String, Vec<String>, Vec<Expr>), // A function has a name (string), arguments and the content
 }
 
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Constant(atom) => write!(f, "{atom}"),
+            _ => Ok(()),
+        }
+    }
+}
+
 // Defines a parser for function calls with arguments.
 pub fn parse_call(input: &str) -> IResult<&str, Expr> {
     // Matches the function name consisting of alphabetic characters.
