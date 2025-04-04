@@ -1,0 +1,17 @@
+let age = 21
+let money = 87.3
+let success = true
+
+if age > 10 {
+    println("Successfully older than 10")
+}
+
+if money < 100.0 {
+    println("You are poor, get more than ${money} first")
+}
+
+if success {
+    println("Welcome to the success club!")
+} else {
+    println("Get some success first!")
+}

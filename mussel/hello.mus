@@ -1,6 +1,0 @@
-fn hello(person) {
-    println("Hello {person}")
-}
-let city = "Arendal"
-let name = "SvelteRust, from {city}"
-hello(name)
