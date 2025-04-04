@@ -3,14 +3,16 @@
 // 'IResult' is used to represent the result of parsing.
 // 'bytes::complete::{tag, take_until}' are combinators to match specific patterns in the input.
 // 'sequence::delimited' is a combinator that parses content surrounded by specific patterns.
-use nom::{bytes::complete::{tag, take_until}, combinator::map, sequence::delimited, IResult};
+use nom::{IResult, bytes::complete::{tag, take_until}, sequence::delimited, combinator::map};
 
 // Defines an enumeration 'Atom', which has one variant called 'String'.
 // 'String(String)' represents that this variant stores a value of the type String.
 // Enumerations in Rust are used for grouping related values under one type.
+#[derive(Debug)]
 pub enum Atom {
     String(String),
 }
+
 
 // Declares a function 'parse_string' that takes a string slice '&str' as input.
 // The function returns an 'IResult', which includes the remaining unparsed input and the parsed value.
