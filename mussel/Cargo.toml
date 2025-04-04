@@ -6,3 +6,4 @@ edition = "2024"
 
 [dependencies]
 nom = "7.1"
+nom-supreme = "0.8"

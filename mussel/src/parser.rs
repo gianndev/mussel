@@ -1,137 +1,267 @@
-// Imports necessary modules and functions from the 'nom' library.
-// 'nom' is a parsing library that helps construct parsers using combinators.
 use nom::{
-    branch::alt, bytes::complete::{tag, take_until}, character::complete::{alpha1, multispace0}, combinator::map, error::ParseError, multi::{many0, separated_list0}, sequence::{delimited, preceded, tuple}, IResult // Represents the result of parsing, including unparsed input and parsed value.
+    branch::alt,
+    bytes::complete::{is_not, take_until},
+    character::complete::{alpha1, digit1, multispace0},
+    combinator::{map, opt, recognize},
+    multi::{many0, separated_list0},
+    number::complete::double,
+    sequence::{delimited, pair, preceded, separated_pair, tuple},
 };
+use nom_supreme::{error::ErrorTree, final_parser::final_parser, tag::complete::tag, ParserExt};
+use std::{collections::HashMap, fmt};
 
-// Defines a helper function for handling optional surrounding whitespace.
-// Wraps a parser ('inner') so that it matches input with leading or trailing whitespace.
-fn ws<'a, F: 'a, O, E: ParseError<&'a str>>(
-    inner: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+type Span<'a> = &'a str;
+type IResult<'a, O> = nom::IResult<Span<'a>, O, ErrorTree<Span<'a>>>;
+
+// Whitespace helper from nom docs
+fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<O>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    F: FnMut(&'a str) -> IResult<O>,
 {
     delimited(multispace0, inner, multispace0)
 }
 
-// Defines an enumeration 'Atom' to represent fundamental values.
-// The #[derive(Debug)] attribute allows Atom to be printed for debugging purposes.
-#[derive(Debug, Clone)]
+// Atom parsers
+#[derive(Debug, Clone, PartialEq)]
 pub enum Atom {
-    String(String), // Represents an owned string within the 'Atom::String' variant.
+    Number(i64),
+    Float(f64),
+    Boolean(bool),
     Name(String),
+    String(String),
 }
 
-// Implements the 'Display' trait for the 'Atom' enum.
-// Enables formatted printing of 'Atom' instances with macros like println.
-impl std::fmt::Display for Atom {
-    // Defines how 'Atom' is displayed as a formatted string.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Atom::String(string) => write!(f, "{string}"), // Formats the Atom::String variant by directly printing its inner string value.
-            Atom::Name(string) => write!(f, "{string}"),
+            Atom::Number(number) => write!(f, "{number}"),
+            Atom::Float(float) => write!(f, "{float}"),
+            Atom::Boolean(boolean) => write!(f, "{boolean}"),
+            Atom::Name(name) => write!(f, "{name}"),
+            Atom::String(string) => write!(f, "{string}"),
         }
     }
 }
 
-// Defines a parser for quoted strings.
-pub fn parse_string(input: &str) -> IResult<&str, Atom> {
-    let parser = delimited(tag("\""), take_until("\""), tag("\""));
-    // Matches a string surrounded by double quotes and extracts the content between them.
-    
+fn parse_variable(input: &str) -> IResult<String> {
+    let parser = alpha1.context("Expected name");
+    map(parser, str::to_string)(input)
+}
+
+fn parse_name(input: &str) -> IResult<Atom> {
+    map(parse_variable, Atom::Name)(input)
+}
+
+fn parse_string(input: &str) -> IResult<Atom> {
+    let parser = delimited(tag("\""), take_until("\""), tag("\"")).context("String is incomplete");
     map(parser, |string: &str| Atom::String(string.to_string()))(input)
-    // Transforms the parsed string into an Atom::String variant.
 }
 
-// Defines a parser for quoted strings.
-pub fn parse_variable(input: &str) -> IResult<&str, Atom> {
-    map(alpha1, |string: &str| Atom::Name(string.to_string()))(input)
+fn parse_number(input: &str) -> IResult<Atom> {
+    let parser = recognize(pair(opt(tag("-")), digit1));
+    map(parser, |number: &str| Atom::Number(number.parse().unwrap()))(input)
 }
 
-pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
-    alt((parse_string, parse_variable))(input)
+fn parse_float(input: &str) -> IResult<Atom> {
+    map(double, Atom::Float)(input)
 }
 
-// Defines an enumeration 'Expr' to represent expressions like variable declarations or function calls.
-// The #[derive(Debug)] attribute allows Expr to be printed for debugging purposes.
-#[derive(Debug, Clone)]
+fn parse_boolean(input: &str) -> IResult<Atom> {
+    let parser = alt((map(tag("true"), |_| true), map(tag("false"), |_| false)));
+    map(parser, Atom::Boolean)(input)
+}
+
+fn parse_atom(input: &str) -> IResult<Atom> {
+    alt((
+        parse_string,
+        parse_float,
+        parse_number,
+        parse_boolean,
+        parse_name,
+    ))(input)
+}
+
+// Operator parsers
+#[derive(Debug, Clone, PartialEq)]
+pub enum Operator {
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
+}
+
+fn parse_operator(input: &str) -> IResult<Operator> {
+    alt((
+        map(tag("<="), |_| Operator::LessThanEqual),
+        map(tag("<"), |_| Operator::LessThan),
+        map(tag(">="), |_| Operator::GreaterThanEqual),
+        map(tag(">"), |_| Operator::GreaterThan),
+    ))(input)
+}
+
+// Expression parsers
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Void, // To return nothing
-    Call(String, Vec<Expr>),
-    Let(String, Box<Expr>),
+    Void,
+    Array(Vec<Expr>),
     Constant(Atom),
+    Let(String, Box<Expr>),
+    Call(String, Vec<Expr>),
+    Compare(Box<Expr>, Operator, Box<Expr>),
     Closure(Vec<String>, Vec<Expr>),
-    Function(String, Vec<String>, Vec<Expr>), // A function has a name (string), arguments and the content
+    Function(String, Vec<String>, Vec<Expr>),
+    If(Box<Expr>, Vec<Expr>, Option<Vec<Expr>>),
+    Return(Box<Expr>),
+    For(String, Box<Expr>, Vec<Expr>),
+    Get(String, usize),
 }
 
-impl std::fmt::Display for Expr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expr::Constant(atom) => write!(f, "{atom}"),
+            Expr::Array(items) => {
+                write!(f, "[")?;
+                for (i, expr) in items.iter().enumerate() {
+                    write!(f, "{expr}")?;
+                    if i + 1 < items.len() {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
             _ => Ok(()),
         }
     }
 }
 
-// Defines a parser for function calls with arguments.
-pub fn parse_call(input: &str) -> IResult<&str, Expr> {
-    // Matches the function name consisting of alphabetic characters.
-    let parse_name = alpha1; 
-
-    // Matches the argument enclosed in parentheses (e.g., (argument)).
-    let parse_arg = delimited(tag("("), separated_list0(tag(","), parse_expr), tag(")"));
-
-    // Combines the function name and argument into a tuple.
-    let parser = tuple((parse_name, parse_arg));
-
-    // Transforms the parsed tuple into an Expr::Call variant with owned values.
-    map(parser, |(name, arg)| Expr::Call(name.to_string(), arg))(input)
-}
-
-// Defines a parser for variable declarations using the 'let' keyword.
-pub fn parse_let(input: &str) -> IResult<&str, Expr> {
-    // Matches a variable name preceded by the 'let' keyword, allowing surrounding whitespace.
-    let parse_name = preceded(tag("let"), ws(alpha1));
-
-    // Matches the equals sign and parses the value after it, allowing whitespace.
-    let parse_equals = preceded(tag("="), ws(parse_expr));
-
-    // Combines the variable name and value into a tuple.
-    let parser = tuple((parse_name, parse_equals));
-
-    // Transforms the parsed tuple into an Expr::Let variant with owned values.
-    map(parser, |(name, value)| Expr::Let(name.to_string(), Box::new(value)))(input)
-}
-
-pub fn parse_closure(input: &str) -> IResult<&str, Expr> {
-    let parse_name = map(alpha1, String::from);
-    let parse_args = delimited(tag("|"), separated_list0(tag(","), parse_name), tag("|"));
-    let parser = tuple((ws(parse_args), parse_expr));
-    map(parser, |(args, expr)| Expr::Closure(args, vec![expr]))(input)
-}
-
-pub fn parse_constant(input: &str) -> IResult<&str, Expr> {
+fn parse_constant(input: &str) -> IResult<Expr> {
     map(parse_atom, Expr::Constant)(input)
 }
 
-pub fn parse_name(input: &str) -> IResult<&str, String> {
-    map(alpha1, String::from)(input)
+fn parse_compare_valid(input: &str) -> IResult<Expr> {
+    alt((parse_call, parse_constant))(input)
 }
 
-pub fn parse_function(input: &str) -> IResult<&str, Expr> {
-    let parse_args = delimited(tag("("), separated_list0(tag(","), ws(parse_name)), tag(")"));
+fn parse_compare(input: &str) -> IResult<Expr> {
+    let parser = tuple((parse_compare_valid, ws(parse_operator), parse_compare_valid));
+    map(parser, |(left, operator, right)| {
+        Expr::Compare(Box::new(left), operator, Box::new(right))
+    })(input)
+}
+
+fn parse_let(input: &str) -> IResult<Expr> {
+    let parse_statement = separated_pair(parse_variable, ws(tag("=")), parse_expr);
+    let parser = preceded(ws(tag("let")), parse_statement).context("Invalid let statement");
+    map(parser, |(name, expr)| Expr::Let(name, Box::new(expr)))(input)
+}
+
+fn parse_call(input: &str) -> IResult<Expr> {
+    let parse_args = delimited(
+        tag("("),
+        separated_list0(tag(","), ws(parse_expr)),
+        tag(")"),
+    );
+    let parser = pair(parse_variable, parse_args).context("Invalid function call");
+    map(parser, |(name, args)| Expr::Call(name, args))(input)
+}
+
+fn parse_function(input: &str) -> IResult<Expr> {
+    let parse_args = delimited(
+        tag("("),
+        separated_list0(tag(","), ws(parse_variable)),
+        tag(")"),
+    );
     let parse_body = delimited(tag("{"), ws(many0(parse_expr)), tag("}"));
-    let parser = preceded(tag("fn"), tuple((ws(parse_name), parse_args, ws(parse_body))));
-    map(parser, |(name, args, body)| Expr::Function(name, args, body))(input)
+    let parser = preceded(
+        tag("fn"),
+        tuple((ws(parse_variable), parse_args, ws(parse_body))),
+    );
+    map(parser, |(name, args, body)| {
+        Expr::Function(name, args, body)
+    })(input)
 }
 
-// Defines a parser for multiple expressions, which can include both 'let' declarations and function calls.
-pub fn parse_expr(input: &str) -> IResult<&str, Expr> {
-    // Parses zero or more expressions (both 'let' and function calls), allowing whitespace between them.
-    alt((parse_function, parse_closure, parse_call, parse_let, parse_constant))(input)
+fn parse_closure(input: &str) -> IResult<Expr> {
+    let parse_args = delimited(
+        tag("|"),
+        separated_list0(tag(","), ws(parse_variable)),
+        tag("|"),
+    );
+    let parser = pair(parse_args, ws(parse_expr));
+    map(parser, |(args, expr)| Expr::Closure(args, vec![expr]))(input)
 }
 
-pub fn parser(input: &str) -> IResult<&str, Vec<Expr>> {
-    many0(ws(parse_expr))(input)
+fn parse_if(input: &str) -> IResult<Expr> {
+    let parse_statement = preceded(tag("if"), ws(parse_expr));
+    let parse_then = delimited(tag("{"), ws(many0(parse_expr)), tag("}"));
+    let parse_else = preceded(
+        ws(tag("else")),
+        delimited(tag("{"), ws(many0(parse_expr)), tag("}")),
+    );
+    let parser = tuple((parse_statement, parse_then, opt(parse_else)));
+    map(parser, |(statement, then, otherwise)| {
+        Expr::If(Box::new(statement), then, otherwise)
+    })(input)
+}
+
+fn parse_for(input: &str) -> IResult<Expr> {
+    let parse_name = preceded(tag("for"), ws(parse_variable));
+    let parse_collection = preceded(tag("in"), ws(parse_expr));
+    let parse_body = delimited(tag("{"), ws(many0(parse_expr)), tag("}"));
+    let parser = tuple((parse_name, parse_collection, parse_body));
+    map(parser, |(name, collection, body)| {
+        Expr::For(name, Box::new(collection), body)
+    })(input)
+}
+
+fn parse_return(input: &str) -> IResult<Expr> {
+    let parser = preceded(tag("return"), ws(parse_expr));
+    map(parser, |expr| Expr::Return(Box::new(expr)))(input)
+}
+
+fn parse_array(input: &str) -> IResult<Expr> {
+    let parser = delimited(
+        tag("["),
+        separated_list0(tag(","), ws(parse_expr)),
+        tag("]"),
+    );
+    map(parser, Expr::Array)(input)
+}
+
+fn parse_get(input: &str) -> IResult<Expr> {
+    let parse_number = map(digit1, |digits: &str| digits.parse::<usize>().unwrap());
+    let parse_index = delimited(tag("["), parse_number, tag("]"));
+    let parser = pair(parse_variable, parse_index);
+    map(parser, |(name, index)| Expr::Get(name, index))(input)
+}
+
+fn parse_expr(input: &str) -> IResult<Expr> {
+    alt((
+        parse_return,
+        parse_function,
+        parse_for,
+        parse_if,
+        parse_let,
+        parse_compare,
+        parse_array,
+        parse_closure,
+        parse_get,
+        parse_call,
+        parse_constant,
+    ))(input)
+}
+
+// Other parsers to be used in the evaluator, such as interpolation
+pub fn parse_interpolation(input: &str) -> IResult<Vec<Expr>> {
+    let parse_braces = delimited(tag("{"), ws(parse_expr), tag("}"));
+    let parse_string = map(is_not("{"), |string: &str| {
+        Expr::Constant(Atom::String(string.to_string()))
+    });
+    many0(alt((parse_braces, parse_string)))(input)
+}
+
+// Final parser which ties everything together
+pub fn parser(input: &str) -> Result<Vec<Expr>, ErrorTree<&str>> {
+    final_parser(many0(ws(parse_expr)))(input)
 }
