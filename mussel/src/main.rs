@@ -1,17 +1,36 @@
-mod parser; // Links the 'parser' module, providing access to its parsing functions and types.
-mod interpreter; // Links the 'interpreter' module, enabling the execution of parsed expressions.
-use std::collections::HashMap;
+use argh::FromArgs;
+use color_eyre::{
+    eyre::{eyre, WrapErr},
+    Help, Result,
+};
 
-fn main() {
-    // Reads the contents of the file 'hello.mus' at compile time and includes it as a string
-    let input = include_str!("../hello.mus");
+// Modules
+mod interpreter;
+mod parser;
 
-    // Parses the file content into a vector of expressions using 'parse_expr'.
-    // The 'unwrap()' method is used to extract the parsing result, assuming it succeeds.
-    let (_, exprs) = parser::parser(input).unwrap();
+#[derive(FromArgs)]
+/// Interpreter for the salt language
+struct Args {
+    /// file to run
+    #[argh(positional)]
+    file: String,
+}
 
-    let mut context = HashMap::new();
-    for expr in exprs {
-        interpreter::interpreter(expr, &mut context);
-    }
+fn main() -> Result<()> {
+    // Nicer panics / error messages
+    color_eyre::install()?;
+
+    // Get file
+    let Args { file } = argh::from_env();
+    let input = std::fs::read_to_string(&file)
+        .wrap_err(format!("Failed to read file: \"{file}\""))
+        .suggestion("try using a file that exists")?;
+
+    // Parse file and evaluate it
+    let exprs =
+        parser::parser(&input).map_err(|error| eyre!("Error occurred while parsing: {error:#?}"))?;
+    interpreter::interpreter(exprs);
+
+    // Success!
+    Ok(())
 }
