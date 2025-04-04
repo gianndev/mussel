@@ -5,17 +5,11 @@ fn main() {
     // Includes the contents of 'input.mopl' as a string at compile time.
     let input = include_str!("../hello.mus"); // Reads the content of the mopl file.
 
-    // Attempts to parse the file content using 'parse_call'.
-    // Handles the Result explicitly to manage errors gracefully.
-    match parser::parse_call(input) {
-        Ok((_, expr)) => {
-            // Successfully parses the input and extracts the expression.
-            interpreter::interpreter(expr); 
-            // Passes the parsed expression to the 'interpreter' function for execution.
-        },
-        Err(err) => {
-            // Prints an error message if parsing fails.
-            eprintln!("Failed to parse input: {:?}", err);
-        },
-    }
+    // Parses the file content using 'parse_call' and unwraps the result.
+    // The 'unwrap()' method extracts the parsed expression, assuming successful parsing.
+    let (_, expr) = parser::parse_call(input).unwrap(); 
+
+    // Calls the 'interpreter' function from the 'interpreter' module, passing the parsed expression.
+    // This executes the logic defined in the interpreter.
+    interpreter::interpreter(expr); 
 }
