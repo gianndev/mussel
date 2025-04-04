@@ -1,62 +1,95 @@
 // Imports necessary modules and functions from the 'nom' library.
 // 'nom' is a parsing library that helps construct parsers using combinators.
 use nom::{
+    bytes::complete::{tag, take_until}, // For matching specific bytes or patterns.
+    character::complete::{alpha1, multispace0}, // For matching alphabetic characters and whitespace.
+    combinator::map, // For transforming parsed values.
+    error::ParseError, // For error handling during parsing.
+    multi::many0, // For parsing zero or more repetitions of a pattern.
+    sequence::{delimited, preceded, tuple}, // For combining multiple patterns in specific orders.
+    branch::alt, // For trying multiple alternative parsers.
     IResult, // Represents the result of parsing, including unparsed input and parsed value.
-    bytes::complete::{tag, take_until}, // Combinators for matching specific patterns in input.
-    sequence::{delimited, tuple}, // Combines parsing patterns in specific sequences.
-    combinator::map, // Allows transformation of parsed values.
-    character::complete::alpha1 // Matches alphabetic characters in input.
 };
 
-// Defines an enumeration 'Atom' with one variant 'String'.
-// The #[derive(Debug)] allows Atom to be printed for debugging.
-#[derive(Debug)]
-pub enum Atom {
-    String(String), // Stores an owned String inside the Atom::String variant.
+// Defines a helper function for handling optional surrounding whitespace.
+// Wraps a parser ('inner') so that it matches input with leading or trailing whitespace.
+fn ws<'a, F: 'a, O, E: ParseError<&'a str>>(
+    inner: F,
+) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+where
+    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+{
+    delimited(multispace0, inner, multispace0)
 }
 
-// Implements the Display trait for the Atom enum.
-// The Display trait allows the Atom enum to be printed in a user-friendly format using the println macro or similar.
+// Defines an enumeration 'Atom' to represent fundamental values.
+// The #[derive(Debug)] attribute allows Atom to be printed for debugging purposes.
+#[derive(Debug)]
+pub enum Atom {
+    String(String), // Represents an owned string within the 'Atom::String' variant.
+}
+
+// Implements the 'Display' trait for the 'Atom' enum.
+// Enables formatted printing of 'Atom' instances with macros like println.
 impl std::fmt::Display for Atom {
-    // Defines the fmt method, which controls how Atom is displayed as a formatted string.
+    // Defines how 'Atom' is displayed as a formatted string.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Matches the variant of Atom to determine how it should be displayed.
         match self {
             Atom::String(string) => write!(f, "{string}"), 
-            // Formats the Atom::String variant by directly printing its inner String value.
-            // The write! macro writes the formatted string to the output formatter 'f'.
+            // Formats the Atom::String variant by directly printing its inner string value.
         }
     }
 }
 
-// Declares a function 'parse_string' that parses quoted strings in input.
+// Defines a parser for quoted strings.
 pub fn parse_string(input: &str) -> IResult<&str, Atom> {
-
-    // Creates a parser for matching strings surrounded by double quotes.
     let parser = delimited(tag("\""), take_until("\""), tag("\""));
-
-    // Transforms the parsed result into an Atom::String variant.
+    // Matches a string surrounded by double quotes and extracts the content between them.
+    
     map(parser, |string: &str| Atom::String(string.to_string()))(input)
+    // Transforms the parsed string into an Atom::String variant.
 }
 
-// Defines an enumeration 'Expr' for representing expressions like function calls.
-// The #[derive(Debug)] allows Expr to be printed for debugging.
+// Defines an enumeration 'Expr' to represent expressions like variable declarations or function calls.
+// The #[derive(Debug)] attribute allows Expr to be printed for debugging purposes.
 #[derive(Debug)]
 pub enum Expr {
-    Call(String, Atom), // Represents a function call with a name and argument.
+    Let(String, Atom), // Represents a variable declaration with a name and a value.
+    Call(String, Atom), // Represents a function call with a name and an argument.
 }
 
-// Declares a function 'parse_call' for parsing function calls with arguments.
+// Defines a parser for function calls with arguments.
 pub fn parse_call(input: &str) -> IResult<&str, Expr> {
+    // Matches the function name consisting of alphabetic characters.
+    let parse_name = alpha1; 
 
-    let parse_name = alpha1; // Matches the name of the function (alphabetic characters).
-
-    // Matches the argument enclosed within parentheses, e.g., (argument).
+    // Matches the argument enclosed in parentheses (e.g., (argument)).
     let parse_arg = delimited(tag("("), parse_string, tag(")"));
 
-    // Combines function name and argument into a tuple (name, argument).
+    // Combines the function name and argument into a tuple.
     let parser = tuple((parse_name, parse_arg));
 
     // Transforms the parsed tuple into an Expr::Call variant with owned values.
     map(parser, |(name, arg)| Expr::Call(name.to_string(), arg))(input)
+}
+
+// Defines a parser for variable declarations using the 'let' keyword.
+pub fn parse_let(input: &str) -> IResult<&str, Expr> {
+    // Matches a variable name preceded by the 'let' keyword, allowing surrounding whitespace.
+    let parse_name = preceded(tag("let"), ws(alpha1));
+
+    // Matches the equals sign and parses the value after it, allowing whitespace.
+    let parse_equals = preceded(tag("="), ws(parse_string));
+
+    // Combines the variable name and value into a tuple.
+    let parser = tuple((parse_name, parse_equals));
+
+    // Transforms the parsed tuple into an Expr::Let variant with owned values.
+    map(parser, |(name, value)| Expr::Let(name.to_string(), value))(input)
+}
+
+// Defines a parser for multiple expressions, which can include both 'let' declarations and function calls.
+pub fn parse_expr(input: &str) -> IResult<&str, Vec<Expr>> {
+    // Parses zero or more expressions (both 'let' and function calls), allowing whitespace between them.
+    many0(ws(alt((parse_let, parse_call))))(input)
 }

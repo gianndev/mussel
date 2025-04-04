@@ -1,15 +1,14 @@
-mod parser;
-mod interpreter;
+mod parser; // Links the 'parser' module, providing access to its parsing functions and types.
+mod interpreter; // Links the 'interpreter' module, enabling the execution of parsed expressions.
 
 fn main() {
-    // Includes the contents of 'input.mopl' as a string at compile time.
-    let input = include_str!("../hello.mus"); // Reads the content of the mopl file.
+    // Reads the contents of the file 'hello.mus' at compile time and includes it as a string
+    let input = include_str!("../hello.mus");
 
-    // Parses the file content using 'parse_call' and unwraps the result.
-    // The 'unwrap()' method extracts the parsed expression, assuming successful parsing.
-    let (_, expr) = parser::parse_call(input).unwrap(); 
+    // Parses the file content into a vector of expressions using 'parse_expr'.
+    // The 'unwrap()' method is used to extract the parsing result, assuming it succeeds.
+    let (_, expr) = parser::parse_expr(input).unwrap();
 
-    // Calls the 'interpreter' function from the 'interpreter' module, passing the parsed expression.
-    // This executes the logic defined in the interpreter.
-    interpreter::interpreter(expr); 
+    // Prints the parsed expressions for debugging purposes.
+    dbg!(&expr);
 }

@@ -1,4 +1,4 @@
-use crate::parser::*; // Imports everything from the 'parse' module, allowing access to 'Expr' and other definitions.
+use crate::parser::*;
 
 // Declares the 'interpreter' function, which takes an expression ('Expr') as input.
 pub fn interpreter(expr: Expr) {
@@ -15,5 +15,6 @@ pub fn interpreter(expr: Expr) {
                 println!("{arg}");
             }
         },
+        _ => {}, // Ignores other variants (e.g., 'Let') for now.
     }
 }
