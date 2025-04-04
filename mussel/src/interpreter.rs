@@ -10,8 +10,9 @@ pub fn interpreter(expr: Expr) {
             // Checks if the function name is "println", which is used for printing output.
             if name == "println" {
                 
-                // Prints the argument in debug format ('{:?}'), which includes details for debugging.
-                println!("{arg:?}");
+                // Prints the argument using its Display implementation.
+                // This ensures the argument is displayed in a user-friendly format.
+                println!("{arg}");
             }
         },
     }

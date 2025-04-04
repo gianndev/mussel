@@ -15,6 +15,20 @@ pub enum Atom {
     String(String), // Stores an owned String inside the Atom::String variant.
 }
 
+// Implements the Display trait for the Atom enum.
+// The Display trait allows the Atom enum to be printed in a user-friendly format using the println macro or similar.
+impl std::fmt::Display for Atom {
+    // Defines the fmt method, which controls how Atom is displayed as a formatted string.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Matches the variant of Atom to determine how it should be displayed.
+        match self {
+            Atom::String(string) => write!(f, "{string}"), 
+            // Formats the Atom::String variant by directly printing its inner String value.
+            // The write! macro writes the formatted string to the output formatter 'f'.
+        }
+    }
+}
+
 // Declares a function 'parse_string' that parses quoted strings in input.
 pub fn parse_string(input: &str) -> IResult<&str, Atom> {
 
