@@ -15,9 +15,9 @@ pub fn interpreter(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             Expr::Void // Return a default value after side-effect
         },
         Expr::Constant(ref atom) => match atom {
-            Atom::Name(name) => context.get(name.as_str()).unwrap().clone(),
+            Atom::Name(name) => context.get(name).unwrap().clone(),
             _ => expr,  // Return the original expression
         },
-        Expr::Void => Expr::Void,  // Handle the Void case explicitly
+        Expr::Void => expr,  // Handle the Void case explicitly
     }
 }
