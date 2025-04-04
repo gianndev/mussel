@@ -1,5 +1,6 @@
-fn printer(name) {
-    println("Hello", name)
-    println("This is cool!")
+fn hello(person) {
+    println("Hello {person}")
 }
-printer("Francesco")
+let city = "Arendal"
+let name = "SvelteRust, from {city}"
+hello(name)
