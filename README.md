@@ -13,3 +13,6 @@ You can find a detailed tutorial to learn how Mussel works [here](/doc/Tutorial.
 ## Practical Example
 
 You can find some examples of Mussel code in the [examples](/examples/) folder.
+
+## Version
+The current latest versionof Mussel is 0.0.1
