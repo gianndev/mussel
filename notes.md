@@ -11,3 +11,7 @@
 ## Nom
 
 'Nom' is a parser combinator library which makes it possible to combine different parsers.
+
+## TODO:
+
+1. Add explicative comments everywhere
