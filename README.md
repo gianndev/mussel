@@ -9,7 +9,6 @@
 ## Table of Contents
 
 - [Features](#features)
-- [Getting Started](#getting-started)
 - [Language Syntax & Constructs](#language-syntax--constructs)
   - [Atoms and Constants](#atoms-and-constants)
   - [Let Bindings](#let-bindings)
@@ -29,31 +28,6 @@
 - **Error Reporting:** Uses `color_eyre` for enhanced and user-friendly error messages.
 - **Built-in Functions:** Includes common functions like `println` for printing to the console.
 - **String Interpolation:** Embed expressions directly within string literals for dynamic output.
-
-## Getting Started
-
-### Prerequisites
-
-To build and run Mussel, you will need:
-- [Rust](https://www.rust-lang.org/tools/install) (stable channel)
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/mussel.git
-   cd mussel
-   ```
-
-2. Build the project with Cargo:
-   ```bash
-   cargo build --release
-   ```
-
-3. Run the interpreter with a Mussel script:
-   ```bash
-   cargo run FILE=path/to/your_file.mus
-   ```
 
 ## Language Syntax & Constructs
 
@@ -162,63 +136,7 @@ println("Hello, {name}!")  // Prints: Hello, Alice!
 
 ## Tutorial & Practical Example
 
-Below is a sample Mussel script that demonstrates several features of the language:
-
-```mussel
-// Define a function to add two numbers
-fn add(a, b) {
-    return a + b
-}
-
-// Use a let binding to store a greeting
-let greeting = "Hello, Mussel!"
-
-// Print the greeting
-println(greeting)
-
-// Demonstrate string interpolation
-let name = "Bob"
-println("Welcome, {name}! Let's do some math:")
-
-// Call the add function and store the result
-let sum = add(10, 20)
-println("10 + 20 = {sum}")
-
-// Create an array of numbers
-let numbers = [1, 2, 3, 4, 5]
-
-// Iterate over the array and print each number
-for num in numbers {
-    println("Number: {num}")
-}
-
-// Conditional execution with if statement
-if sum > 25 {
-    println("The sum is greater than 25!")
-} else {
-    println("The sum is 25 or less!")
-}
-```
-
-### Running the Example
-
-1. Save the above script as `example.mus`.
-2. Run the interpreter with the script:
-   ```bash
-   make run FILE=example.mus
-   ```
-3. You should see output similar to:
-   ```
-   Hello, Mussel!
-   Welcome, Bob! Let's do some math:
-   10 + 20 = 30
-   Number: 1
-   Number: 2
-   Number: 3
-   Number: 4
-   Number: 5
-   The sum is greater than 25!
-   ```
+You can find some examples of Mussel code in the `examples/` folder
 
 ## How It Works
 

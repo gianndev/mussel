@@ -1,0 +1,7 @@
+let fruits = ["apple", "banana", "cherry"]
+
+for fruit in fruits {
+    println("Fruit: {fruit}")
+}
+
+println("The second fruit is {fruits[1]}")
