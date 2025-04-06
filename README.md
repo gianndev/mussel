@@ -14,5 +14,33 @@ You can find a detailed tutorial to learn how Mussel works [here](/doc/Tutorial.
 
 You can find some examples of Mussel code in the [examples](/examples/) folder.
 
+## How to run Mussel code?
+
+1. **Install Rust:**
+
+   Rust is required to build Mussel code. You can download it from [rust-lang.org](https://www.rust-lang.org/).
+
+2. **Clone the repo:**
+
+    ```
+    git clone https://github.com/gianndev/mussel.git
+    cd mussel
+    ```
+
+3. **Compile the Rust code:**
+    
+    To build the release version of Mussel you can use the Makefile just typing
+    ```
+    make release
+    ```
+
+4. **Run Mussel code:**
+
+    Once you've created a file with the **.mus** file extension (the official extension of Mussel) you can run the Mussel code typing in the terminal
+    ```
+    make run FILE=path/to/the/file.mus
+    ```
+    Make sure to insert the correct path of the Mussel file
+
 ## Version
 The current latest versionof Mussel is 0.0.1
