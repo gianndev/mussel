@@ -1,0 +1,5 @@
+// This is a comment
+
+let var = 5 // This is a variable
+
+println("The variable is {var}") // Print on screen

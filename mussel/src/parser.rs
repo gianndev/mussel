@@ -12,9 +12,14 @@ use nom::{
 use nom_supreme::{
     error::ErrorTree, // An error type that provides detailed error trees.
     final_parser::final_parser, // Helper to run a parser until the end of input.
-    tag::complete::tag, // Parser that matches a literal string exactly.
     ParserExt, // Extension traits for parsers.
 };
+use nom::bytes::complete::{take_while}; // for consuming characters in comments
+use nom::character::complete::{line_ending}; // to match newline characters
+use nom::sequence::terminated; // to terminate the comment with a newline
+use nom::Parser;
+use nom::bytes::complete::tag;
+
 // Import standard formatting traits for implementing display functionality.
 use std::fmt;
 
@@ -29,7 +34,29 @@ fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<O>
 where
     F: FnMut(&'a str) -> IResult<O>,
 {
-    delimited(multispace0, inner, multispace0)
+    delimited(skip_ws_comments, inner, skip_ws_comments)
+}
+
+fn skip_ws_comments(input: Span) -> IResult<()> {
+    let line_comment = preceded(
+        tag("//"),
+        terminated(
+            take_while(|c| c != '\n' && c != '\r'),
+            opt(line_ending)
+        )
+    ).map(|_| ());
+    
+    // Use multispace1 to ensure at least one whitespace character is consumed.
+    let whitespace = nom::character::complete::multispace1.map(|_| ());
+    
+    // Try to consume a comment before falling back to whitespace.
+    let mut parser = many0(alt((
+        line_comment,
+        whitespace,
+    )));
+    
+    let (input, _) = parser(input)?;
+    Ok((input, ()))
 }
 
 // Define the `Atom` enum representing the basic literal values in the language.
