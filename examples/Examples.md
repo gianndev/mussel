@@ -17,3 +17,9 @@ This example demonstrates control flow with an if statement and a for loop.
 ### array.mus
 
 An example demonstrating array usage and element access.
+
+---
+
+### comments.mus
+
+An example demonstrating that Mussel now supports comments.

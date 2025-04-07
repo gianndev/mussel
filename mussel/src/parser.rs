@@ -1,20 +1,35 @@
+// Copyright (c) 2025 Francesco Giannice
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Import various combinators and types from the `nom` crate which is used for parsing.
 use nom::{
+    Parser,
     branch::alt, // `alt` tries multiple parsers in order until one succeeds.
-    bytes::complete::{is_not, take_until}, // Parsers for matching parts of a string.
-    character::complete::{alpha1, digit1, multispace0}, // Parsers for alphabetic characters, digits, and whitespace.
+    bytes::complete::{is_not, take_until, take_while, tag}, // Parsers for matching parts of a string.
+    character::complete::{alpha1, digit1, line_ending}, // Parsers for alphabetic characters, digits, and whitespace.
     combinator::{map, opt, recognize}, // `map` transforms parser output; `opt` makes a parser optional; `recognize` returns the matched slice.
     multi::{many0, separated_list0}, // `many0` for zero or more occurrences; `separated_list0` for a list with a separator.
     number::complete::double, // Parser to match a floating point number.
-    sequence::{delimited, pair, preceded, separated_pair, tuple}, // Combinators for parsing sequences.
+    sequence::{delimited, pair, preceded, separated_pair, tuple, terminated}, // Combinators for parsing sequences.
 };
 // Import enhanced error reporting and additional parser functionality from the `nom_supreme` crate.
 use nom_supreme::{
     error::ErrorTree, // An error type that provides detailed error trees.
     final_parser::final_parser, // Helper to run a parser until the end of input.
-    tag::complete::tag, // Parser that matches a literal string exactly.
     ParserExt, // Extension traits for parsers.
 };
+
 // Import standard formatting traits for implementing display functionality.
 use std::fmt;
 
@@ -29,7 +44,29 @@ fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<O>
 where
     F: FnMut(&'a str) -> IResult<O>,
 {
-    delimited(multispace0, inner, multispace0)
+    delimited(skip_ws_comments, inner, skip_ws_comments)
+}
+
+fn skip_ws_comments(input: Span) -> IResult<()> {
+    let line_comment = preceded(
+        tag("//"),
+        terminated(
+            take_while(|c| c != '\n' && c != '\r'),
+            opt(line_ending)
+        )
+    ).map(|_| ());
+    
+    // Use multispace1 to ensure at least one whitespace character is consumed.
+    let whitespace = nom::character::complete::multispace1.map(|_| ());
+    
+    // Try to consume a comment before falling back to whitespace.
+    let mut parser = many0(alt((
+        line_comment,
+        whitespace,
+    )));
+    
+    let (input, _) = parser(input)?;
+    Ok((input, ()))
 }
 
 // Define the `Atom` enum representing the basic literal values in the language.
@@ -107,6 +144,8 @@ fn parse_atom(input: &str) -> IResult<Atom> {
 // Define an enum for comparison operators.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
+    Equal,            // Represents "=="
+    NotEqual,         // Represents "!="
     LessThan,         // Represents "<"
     LessThanEqual,    // Represents "<="
     GreaterThan,      // Represents ">"
@@ -116,6 +155,8 @@ pub enum Operator {
 // Parse an operator by trying to match each literal string.
 fn parse_operator(input: &str) -> IResult<Operator> {
     alt((
+        map(tag("=="), |_| Operator::Equal),
+        map(tag("!="), |_| Operator::NotEqual),
         map(tag("<="), |_| Operator::LessThanEqual),
         map(tag("<"), |_| Operator::LessThan),
         map(tag(">="), |_| Operator::GreaterThanEqual),
