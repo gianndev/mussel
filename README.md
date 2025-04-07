@@ -43,4 +43,9 @@ You can find some examples of Mussel code in the [examples](/examples/) folder.
     Make sure to insert the correct path of the Mussel file
 
 ## Version
-The current latest versionof Mussel is 0.0.1
+
+The current latest versionof Mussel is 0.0.2
+
+## License
+
+Mussel is released under the Apache License 2.0

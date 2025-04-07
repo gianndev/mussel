@@ -1,3 +1,17 @@
+// Copyright (c) 2025 Francesco Giannice
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Import definitions from the parser module that are needed for evaluation.
 use crate::parser::{parse_interpolation, Atom, Expr, Operator};
 // Import the HashMap collection to maintain variable bindings.
@@ -71,7 +85,6 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         Expr::Compare(left, operator, right) => {
             let left = interpreter_expr(*left, context);
             let right = interpreter_expr(*right, context);
-            // Perform the comparison based on the types of the left and right expressions.
             match (&left, operator, &right) {
                 (
                     Expr::Constant(Atom::Number(left)),
@@ -82,6 +95,8 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                     Operator::LessThanEqual => Expr::Constant(Atom::Boolean(left <= right)),
                     Operator::GreaterThan => Expr::Constant(Atom::Boolean(left > right)),
                     Operator::GreaterThanEqual => Expr::Constant(Atom::Boolean(left >= right)),
+                    Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
+                    Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
                 },
                 (
                     Expr::Constant(Atom::Float(left)),
@@ -92,11 +107,12 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                     Operator::LessThanEqual => Expr::Constant(Atom::Boolean(left <= right)),
                     Operator::GreaterThan => Expr::Constant(Atom::Boolean(left > right)),
                     Operator::GreaterThanEqual => Expr::Constant(Atom::Boolean(left >= right)),
+                    Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
+                    Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
                 },
-                // If types are mismatched or unsupported, panic with an error message.
                 _ => panic!("Can't compare {left} or {right}"),
             }
-        }
+        },
         // Evaluate an if-statement.
         Expr::If(statement, then, otherwise) => {
             // Evaluate the condition expecting a boolean result.
