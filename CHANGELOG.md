@@ -3,6 +3,7 @@
 ## x.x.x (xxxx-xx-xx)
 - Added comments implementation
 - Added `==` and `!=` as comparison operators
+- Added Apache 2.0 License
 
 ## 0.0.1 (2025-04-06)
 - Added parser

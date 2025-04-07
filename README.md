@@ -44,3 +44,7 @@ You can find some examples of Mussel code in the [examples](/examples/) folder.
 
 ## Version
 The current latest versionof Mussel is 0.0.1
+
+## License
+
+Mussel is released under the Apache License 2.0
