@@ -1,6 +1,6 @@
 # Changelog
 
-## x.x.x (xxxx-xx-xx)
+## 0.0.2 (2025-04-08)
 - Added comments implementation
 - Added `==` and `!=` as comparison operators
 - Added Apache 2.0 License
