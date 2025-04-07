@@ -1,12 +1,13 @@
 // Import various combinators and types from the `nom` crate which is used for parsing.
 use nom::{
+    Parser,
     branch::alt, // `alt` tries multiple parsers in order until one succeeds.
-    bytes::complete::{is_not, take_until}, // Parsers for matching parts of a string.
-    character::complete::{alpha1, digit1, multispace0}, // Parsers for alphabetic characters, digits, and whitespace.
+    bytes::complete::{is_not, take_until, take_while, tag}, // Parsers for matching parts of a string.
+    character::complete::{alpha1, digit1, line_ending}, // Parsers for alphabetic characters, digits, and whitespace.
     combinator::{map, opt, recognize}, // `map` transforms parser output; `opt` makes a parser optional; `recognize` returns the matched slice.
     multi::{many0, separated_list0}, // `many0` for zero or more occurrences; `separated_list0` for a list with a separator.
     number::complete::double, // Parser to match a floating point number.
-    sequence::{delimited, pair, preceded, separated_pair, tuple}, // Combinators for parsing sequences.
+    sequence::{delimited, pair, preceded, separated_pair, tuple, terminated}, // Combinators for parsing sequences.
 };
 // Import enhanced error reporting and additional parser functionality from the `nom_supreme` crate.
 use nom_supreme::{
@@ -14,11 +15,6 @@ use nom_supreme::{
     final_parser::final_parser, // Helper to run a parser until the end of input.
     ParserExt, // Extension traits for parsers.
 };
-use nom::bytes::complete::{take_while}; // for consuming characters in comments
-use nom::character::complete::{line_ending}; // to match newline characters
-use nom::sequence::terminated; // to terminate the comment with a newline
-use nom::Parser;
-use nom::bytes::complete::tag;
 
 // Import standard formatting traits for implementing display functionality.
 use std::fmt;
@@ -134,6 +130,8 @@ fn parse_atom(input: &str) -> IResult<Atom> {
 // Define an enum for comparison operators.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
+    Equal,            // Represents "=="
+    NotEqual,         // Represents "!="
     LessThan,         // Represents "<"
     LessThanEqual,    // Represents "<="
     GreaterThan,      // Represents ">"
@@ -143,6 +141,8 @@ pub enum Operator {
 // Parse an operator by trying to match each literal string.
 fn parse_operator(input: &str) -> IResult<Operator> {
     alt((
+        map(tag("=="), |_| Operator::Equal),
+        map(tag("!="), |_| Operator::NotEqual),
         map(tag("<="), |_| Operator::LessThanEqual),
         map(tag("<"), |_| Operator::LessThan),
         map(tag(">="), |_| Operator::GreaterThanEqual),

@@ -71,7 +71,6 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         Expr::Compare(left, operator, right) => {
             let left = interpreter_expr(*left, context);
             let right = interpreter_expr(*right, context);
-            // Perform the comparison based on the types of the left and right expressions.
             match (&left, operator, &right) {
                 (
                     Expr::Constant(Atom::Number(left)),
@@ -82,6 +81,8 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                     Operator::LessThanEqual => Expr::Constant(Atom::Boolean(left <= right)),
                     Operator::GreaterThan => Expr::Constant(Atom::Boolean(left > right)),
                     Operator::GreaterThanEqual => Expr::Constant(Atom::Boolean(left >= right)),
+                    Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
+                    Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
                 },
                 (
                     Expr::Constant(Atom::Float(left)),
@@ -92,11 +93,12 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                     Operator::LessThanEqual => Expr::Constant(Atom::Boolean(left <= right)),
                     Operator::GreaterThan => Expr::Constant(Atom::Boolean(left > right)),
                     Operator::GreaterThanEqual => Expr::Constant(Atom::Boolean(left >= right)),
+                    Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
+                    Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
                 },
-                // If types are mismatched or unsupported, panic with an error message.
                 _ => panic!("Can't compare {left} or {right}"),
             }
-        }
+        },
         // Evaluate an if-statement.
         Expr::If(statement, then, otherwise) => {
             // Evaluate the condition expecting a boolean result.
