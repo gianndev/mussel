@@ -79,7 +79,6 @@ Arrays are defined with square brackets and elements separated by commas. You ca
 ```
 let fruits = ["apple", "banana", "cherry"]
 println(fruits[1])
-
 ```
 
 ## String Interpolation
@@ -106,7 +105,7 @@ println(result)
 
 *Note: In Mussel, functions are stored as closures in the interpreter's context, allowing for simple first-class function support.*
 
+## Comments
+To add a comment in Mussel code, use `//` for inline comments.
 
-# 🚨 IMPORTANT NOTES:
-1. **Comments ARE NOT supported** in Mussel yet, so if you add something like `//` you will receive an error
-2. You can find some examples of code written in Mussel in the [examples](../examples/Examples.md) folder
+⚠️ *Multiline comments are not supported yet, but you can use `//` for multiple lines if necessary*
