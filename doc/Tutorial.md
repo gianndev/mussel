@@ -149,6 +149,8 @@ The Mussel language supports the following comparison operators:
 
 | Operator     | Meaning              |
 |--------------|----------------------|
+| **`==`**     | Is equal to          |
+| **`!=`**     | Is not equal to      |
 | **`<`**      | Less than            |
 | **`>`**      | Greater than         |
 | **`<=`**     | Less than or equal   |
