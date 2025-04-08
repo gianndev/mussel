@@ -44,7 +44,7 @@ You can find some examples of Mussel code in the [examples](/examples/) folder.
 
 ## Version
 
-The current latest versionof Mussel is 0.0.2
+The current latest version of Mussel is 0.0.2
 
 ## License
 
