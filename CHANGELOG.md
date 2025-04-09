@@ -1,6 +1,6 @@
 # Changelog
 
-## x.x.x (xxxx-xx-xx)
+## 0.0.3 (2025-04-09)
 - Added `else if` as condition
 - Added the ability to compare boolean variables (before i could only compare numbers), for example in `if` loops
 - Added the ability to compare string variables
