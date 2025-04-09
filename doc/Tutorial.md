@@ -16,9 +16,10 @@ Mussel supports the following basic data types:
 Mussel uses the keyword `let` to define a variable, using as logic the name of the variable, then `=` and then the value of the variable
 
 ```
-let name = "John"
-let age = 45
-let is_male = true
+let name = "John" // string
+let age = 45 // integer
+let is_male = true // boolean
+let letters = ["a", "b", "c", "d", "e", "f"] // array
 ```
 
 ⚠️ *There is no need to manually specify the data type and no need to put a `;` at the end of each line: Mussel is smart enough to understand everything by itself*
@@ -34,8 +35,6 @@ println(greet)
 ## Conditionals: *if* and *else*
 Conditionals are represented by the keywords `if` and `else`, followed by the condition and then curly braces are needed to contain the part of the code that is executed if the condition is met
 
-⚠️ *There is no support for a command like `else if` yet, so there are only two possible values that can stay in the same condition*
-
 The Mussel language supports the following comparison operators:
 
 | Operator     | Meaning              |
@@ -50,16 +49,14 @@ The Mussel language supports the following comparison operators:
 Below there is an example of Mussel code that uses everything we have seen until now:
 
 ```
-let number = -29
+let number = 0
 
 if number > 0 {
     println("{number} is positive.")
-} else {
-    if number < 0 {
-        println("{number} is negative.")
-    } else {
-        println("The number is zero.")
-    }
+} else if number < 0 { 
+    println("{number} is negative.")
+} else { 
+    println("The number is zero.")  
 }
 ```
 
@@ -98,6 +95,7 @@ Functions are defined with the `fn` keyword. A function includes a name, paramet
 Example of function definition:
 
 ```
+// Defined a function to add two numbers
 fn add(a, b) {
     return a + b
 }
