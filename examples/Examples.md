@@ -8,12 +8,6 @@ This file just prints an `Hello, Mussel!` on screen.
 
 ---
 
-### control.mus
-
-This example demonstrates control flow with an if statement and a for loop.
-
----
-
 ### array.mus
 
 An example demonstrating array usage and element access.
@@ -23,3 +17,21 @@ An example demonstrating array usage and element access.
 ### comments.mus
 
 An example demonstrating that Mussel now supports comments.
+
+---
+
+### loop.mus
+
+An example demonstrating how array are defined and then printed using a `for` loop
+
+---
+
+### else_if.mus
+
+An example demonstrating how conditions work and in particular the latest `else if` condition
+
+---
+
+### if_tests.mus
+
+An example demonstrating some tests with the `if` loops, comparing variables in different ways

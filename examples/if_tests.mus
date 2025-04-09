@@ -1,0 +1,23 @@
+let value = true
+
+if value == true {
+    println("TRUE")
+} else {
+    println("FALSE")
+}
+
+println("---")
+
+// --------------------------------------
+
+let name = "Mark"
+
+if name == "John" {
+    println("You are John")
+} else if name == "Mark" {
+    println("You are Mark")
+} else {
+    println("You have a strange name...")
+}
+
+println("END")

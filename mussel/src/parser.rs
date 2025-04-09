@@ -278,22 +278,28 @@ fn parse_closure(input: &str) -> IResult<Expr> {
     map(parser, |(args, expr)| Expr::Closure(args, vec![expr]))(input)
 }
 
-// Parse an if statement.
+// Parse 'if', 'else if', 'else' statements.
 fn parse_if(input: &str) -> IResult<Expr> {
-    // Parse the if condition expression following the "if" keyword.
-    let parse_statement = preceded(tag("if"), ws(parse_expr));
-    // Parse the "then" branch enclosed in curly braces.
-    let parse_then = delimited(tag("{"), ws(many0(parse_expr)), tag("}"));
-    // Optionally parse the "else" branch.
-    let parse_else = preceded(
+    // Parse the "if" keyword, condition, and then branch.
+    let (input, _) = tag("if")(input)?;
+    let (input, _) = skip_ws_comments(input)?;
+    let (input, condition) = parse_expr(input)?;
+    let (input, _) = skip_ws_comments(input)?;
+    let (input, then_block) = delimited(tag("{"), ws(many0(parse_expr)), tag("}"))(input)?;
+
+    // Parse an optional else branch:
+    // It can be either an "else if" chain or a plain "else" block.
+    let (input, else_branch) = opt(preceded(
         ws(tag("else")),
-        delimited(tag("{"), ws(many0(parse_expr)), tag("}")),
-    );
-    // Combine the condition, then branch, and optional else branch.
-    let parser = tuple((parse_statement, parse_then, opt(parse_else)));
-    map(parser, |(statement, then, otherwise)| {
-        Expr::If(Box::new(statement), then, otherwise)
-    })(input)
+        alt((
+            // "else if": parse another if expression and wrap it in a vector.
+            map(parse_if, |if_expr| vec![if_expr]),
+            // "else": parse a normal block.
+            delimited(tag("{"), ws(many0(parse_expr)), tag("}"))
+        ))
+    ))(input)?;
+
+    Ok((input, Expr::If(Box::new(condition), then_block, else_branch)))
 }
 
 // Parse a for loop.

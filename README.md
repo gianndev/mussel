@@ -6,6 +6,10 @@
 
 **Mussel** is an interpreted programming language written in Rust. It was designed as a simple and flexible language with a focus on easy-to-read syntax and powerful expression evaluation. Mussel supports basic data types, variable bindings, functions, closures, control flow constructs (such as `if` and `for`), and even string interpolation.
 
+## Why should I choose Mussel?
+
+Mussel's interpreter is programmed in Rust, which means that Mussel offers the same advantages as Rust such as **code execution speed** and **security**. In addition, **Mussel's syntax is extremely simple**, comparable to Python's. This union makes Mussel like a language "*safe and fast like Rust and easy to use like Python*".
+
 ## Tutorial
 
 You can find a detailed tutorial to learn how Mussel works [here](/doc/Tutorial.md).
@@ -44,7 +48,7 @@ You can find some examples of Mussel code in the [examples](/examples/) folder.
 
 ## Version
 
-The current latest version of Mussel is 0.0.2
+The current latest version of Mussel is **0.0.3**
 
 ## License
 
