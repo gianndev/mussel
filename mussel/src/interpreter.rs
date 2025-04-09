@@ -110,6 +110,17 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                     Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
                     Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
                 },
+                // New branch for comparing booleans.
+                (
+                    Expr::Constant(Atom::Boolean(left)),
+                    operator,
+                    Expr::Constant(Atom::Boolean(right)),
+                ) => match operator {
+                    Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
+                    Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
+                    // Optionally, you can choose to panic for other operators:
+                    _ => panic!("Invalid comparison operator for booleans: {:?}. Use == or !=", operator),
+                },
                 _ => panic!("Can't compare {left} or {right}"),
             }
         },

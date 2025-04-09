@@ -29,3 +29,9 @@ An example demonstrating how array are defined and then printed using a `for` lo
 ### else_if.mus
 
 An example demonstrating how conditions work and in particular the latest `else if` condition
+
+---
+
+### if_tests.mus
+
+An example demonstrating some tests with the `if` loops, comparing variables in different ways

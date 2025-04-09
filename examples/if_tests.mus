@@ -1,0 +1,7 @@
+let value = true
+
+if value == true {
+    println("TRUE")
+}
+
+println("END")
