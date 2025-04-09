@@ -6,12 +6,13 @@ First off, thank you for taking the time to contribute to Mussel! Contributions 
 
 If you'd like to contribute, please follow these steps:
 
-1. **Clone the repository** locally.
+1. **Fork the repository** and clone it locally.
+
 2. **Create a new branch** for your changes.  
 
    > 📝 **Recommended:** Name your branch after your first or last name (e.g. `john`, `smith`, or `alex-feature`).
 
-3. Make your changes and commit on your new branch.
+3. Make your changes, commit, and push to your fork.
 
 4. **Open a Pull Request** to the main repository with a clear description of what you've changed or added.
 
