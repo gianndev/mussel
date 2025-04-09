@@ -3,7 +3,7 @@
 ## x.x.x (xxxx-xx-xx)
 - Added `else if` as condition
 - Added the ability to compare boolean variables (before i could only compare numbers), for example in `if` loops
-- Added the ability to compare strings variables, for example in `if` loops
+- Added the ability to compare string variables
 
 ## 0.0.2 (2025-04-08)
 - Added comments implementation
