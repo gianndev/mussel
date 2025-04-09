@@ -1,5 +1,8 @@
 # Changelog
 
+## x.x.x (xxxx-xx-xx)
+- Added `else if` as condition
+
 ## 0.0.2 (2025-04-08)
 - Added comments implementation
 - Added `==` and `!=` as comparison operators
