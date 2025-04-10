@@ -47,3 +47,9 @@ Contains examples on how to use the *input()* function in Mussel code
 ### until.mus
 
 Contains examples on how to use the *until* loop (which is the equivalent of the while loop in many languages)
+
+---
+
+### math.mus
+
+Contains examples on defining variables using math expressions
