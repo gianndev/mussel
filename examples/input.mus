@@ -1,0 +1,2 @@
+let name = input("Enter your name: ")
+println("Hello {name}")

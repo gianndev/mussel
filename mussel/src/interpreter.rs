@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Import definitions from the parser module that are needed for evaluation.
-use crate::parser::{parse_interpolation, Atom, Expr, Operator};
+use crate::parser::{parse_interpolation, Atom, BinOp, Expr, Operator};
 // Import the HashMap collection to maintain variable bindings.
 use std::collections::HashMap;
 
@@ -157,11 +157,31 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         // Evaluate a function call.
         Expr::Call(name, args) => {
             if name == "println" {
-                // Special case for the built-in "println" function.
+                // Built-in println: evaluate and print each argument.
                 for arg in args {
-                    print!("{}", interpreter_expr(arg, context)); // Print each argument after evaluating.
+                    print!("{}", interpreter_expr(arg, context));
                 }
-                print!("\n"); // Print a newline.
+                println!();
+            } else if name == "input" {
+                // Built-in input: optionally print a prompt and wait for user input.
+                // If an argument is provided, evaluate it and convert to a string prompt.
+                let prompt = if !args.is_empty() {
+                    interpreter_expr(args[0].clone(), context).to_string()
+                } else {
+                    String::new()
+                };
+                // Print the prompt without a newline.
+                print!("{}", prompt);
+                // Flush stdout to ensure the prompt appears.
+                use std::io::{self, Write};
+                io::stdout().flush().expect("Failed to flush stdout");
+                // Read a line from stdin.
+                let mut input_text = String::new();
+                io::stdin().read_line(&mut input_text).expect("Failed to read line");
+                // Trim trailing newline characters.
+                let input_text = input_text.trim_end().to_string();
+                // Return the input as a string atom.
+                return Expr::Constant(Atom::String(input_text));
             } else {
                 // For other function calls, look up the function in the context.
                 match context.get(&name) {
@@ -227,5 +247,60 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             Some(invalid) => panic!("Expected array, got {invalid}"),
             None => panic!("Couldn't find {name}"),
         },
+        Expr::Until(condition, body) => {
+            // Loop until the condition evaluates to true.
+            loop {
+                // Evaluate the condition. Clone the condition so it can be used repeatedly.
+                let cond_result = interpreter_expr((*condition).clone(), context);
+                // Expect the condition to yield a boolean.
+                if let Expr::Constant(Atom::Boolean(true)) = cond_result {
+                    break;
+                }
+                // Otherwise, run each expression in the body.
+                // We clone the body because it may be re-used in further iterations.
+                for expr in body.clone() {
+                    interpreter_expr(expr, context);
+                }
+            }
+            Expr::Void
+        }       
+        Expr::Binary(left_expr, op, right_expr) => {
+            let left = interpreter_expr(*left_expr, context);
+            let right = interpreter_expr(*right_expr, context);
+            match (&left, &right) {
+                (Expr::Constant(Atom::Number(l)), Expr::Constant(Atom::Number(r))) => {
+                    let result = match op {
+                        BinOp::Add => l + r,
+                        BinOp::Sub => l - r,
+                        BinOp::Mul => l * r,
+                        BinOp::Div => {
+                            if *r == 0 {
+                                panic!("Division by zero");
+                            } else {
+                                l / r
+                            }
+                        }
+                    };
+                    Expr::Constant(Atom::Number(result))
+                },
+                // If you also want to support floating-point arithmetic, you can add a branch:
+                (Expr::Constant(Atom::Float(l)), Expr::Constant(Atom::Float(r))) => {
+                    let result = match op {
+                        BinOp::Add => l + r,
+                        BinOp::Sub => l - r,
+                        BinOp::Mul => l * r,
+                        BinOp::Div => {
+                            if *r == 0.0 {
+                                panic!("Division by zero");
+                            } else {
+                                l / r
+                            }
+                        }
+                    };
+                    Expr::Constant(Atom::Float(result))
+                },
+                _ => panic!("Arithmetic operations are only supported between numbers"),
+            }
+        } 
     }
 }

@@ -1,0 +1,7 @@
+let variable = 1
+
+// As long as variable is not 1...
+until variable != 1 {
+    println("PRINTED")
+    let variable = 2
+}

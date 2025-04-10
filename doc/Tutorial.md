@@ -32,6 +32,14 @@ let greet = "Hello dude!"
 println(greet)
 ```
 
+## input() function
+To allow a user to enter data and have this data saved in a variable, the `input()` function is used
+
+```
+let name = input("Enter your name: ")
+println("Hello {name}")
+```
+
 ## Conditionals: *if* and *else*
 Conditionals are represented by the keywords `if` and `else`, followed by the condition and then curly braces are needed to contain the part of the code that is executed if the condition is met
 
@@ -68,6 +76,18 @@ let numbers = [1, 2, 3, 4, 5]
 
 for num in numbers {
     println(num)
+}
+```
+
+## *until* loop
+The until loop executes a code as long as a given condition is true: it is the equivalent of the *while loop* in Mussel (in fact i think *until* is a better key-word than *while*)
+
+```
+let variable = 1
+
+until variable != 1 {
+    println("PRINTED")
+    let variable = 2
 }
 ```
 
