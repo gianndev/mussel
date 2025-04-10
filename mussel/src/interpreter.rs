@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Import definitions from the parser module that are needed for evaluation.
-use crate::parser::{parse_interpolation, Atom, Expr, Operator};
+use crate::parser::{parse_interpolation, Atom, BinOp, Expr, Operator};
 // Import the HashMap collection to maintain variable bindings.
 use std::collections::HashMap;
 
@@ -263,6 +263,44 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 }
             }
             Expr::Void
-        }        
+        }       
+        Expr::Binary(left_expr, op, right_expr) => {
+            let left = interpreter_expr(*left_expr, context);
+            let right = interpreter_expr(*right_expr, context);
+            match (&left, &right) {
+                (Expr::Constant(Atom::Number(l)), Expr::Constant(Atom::Number(r))) => {
+                    let result = match op {
+                        BinOp::Add => l + r,
+                        BinOp::Sub => l - r,
+                        BinOp::Mul => l * r,
+                        BinOp::Div => {
+                            if *r == 0 {
+                                panic!("Division by zero");
+                            } else {
+                                l / r
+                            }
+                        }
+                    };
+                    Expr::Constant(Atom::Number(result))
+                },
+                // If you also want to support floating-point arithmetic, you can add a branch:
+                (Expr::Constant(Atom::Float(l)), Expr::Constant(Atom::Float(r))) => {
+                    let result = match op {
+                        BinOp::Add => l + r,
+                        BinOp::Sub => l - r,
+                        BinOp::Mul => l * r,
+                        BinOp::Div => {
+                            if *r == 0.0 {
+                                panic!("Division by zero");
+                            } else {
+                                l / r
+                            }
+                        }
+                    };
+                    Expr::Constant(Atom::Float(result))
+                },
+                _ => panic!("Arithmetic operations are only supported between numbers"),
+            }
+        } 
     }
 }

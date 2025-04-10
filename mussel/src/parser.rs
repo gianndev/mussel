@@ -19,7 +19,7 @@ use nom::{
     bytes::complete::{is_not, take_until, take_while, tag}, // Parsers for matching parts of a string.
     character::complete::{alpha1, digit1, line_ending}, // Parsers for alphabetic characters, digits, and whitespace.
     combinator::{map, opt, recognize}, // `map` transforms parser output; `opt` makes a parser optional; `recognize` returns the matched slice.
-    multi::{many0, separated_list0}, // `many0` for zero or more occurrences; `separated_list0` for a list with a separator.
+    multi::{many0, separated_list0, fold_many0}, // `many0` for zero or more occurrences; `separated_list0` for a list with a separator.
     number::complete::double, // Parser to match a floating point number.
     sequence::{delimited, pair, preceded, separated_pair, tuple, terminated}, // Combinators for parsing sequences.
 };
@@ -164,6 +164,14 @@ fn parse_operator(input: &str) -> IResult<Operator> {
     ))(input)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum BinOp {
+    Add, // +
+    Sub, // -
+    Mul, // *
+    Div, // /
+}
+
 // Define an enum for expressions in the language.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -180,6 +188,7 @@ pub enum Expr {
     For(String, Box<Expr>, Vec<Expr>), // A for loop iterating over a collection.
     Get(String, usize), // Access an element in an array by name and index.
     Until(Box<Expr>, Vec<Expr>), // An until loop: execute the body until the condition becomes true.
+    Binary(Box<Expr>, BinOp, Box<Expr>), // Binary arithmetic expression.
 }
 
 // Implement Display for Expr so that it can be printed.
@@ -355,6 +364,57 @@ fn parse_until(input: &str) -> IResult<Expr> {
     Ok((input, Expr::Until(Box::new(condition), body)))
 }
 
+// parse_factor: a number, a boolean, a string, a name, or a parenthesized expression.
+fn parse_factor(input: &str) -> IResult<Expr> {
+    alt((
+        // Allow parenthesized expressions.
+        delimited(tag("("), ws(parse_expr), tag(")")),
+        // Otherwise, use an existing parser that produces a constant or a variable.
+        parse_constant,
+    ))(input)
+}
+
+// parse_term: handle multiplication and division.
+fn parse_term(input: &str) -> IResult<Expr> {
+    let (input, init) = parse_factor(input)?;
+    fold_many0(
+        pair(ws(alt((tag("*"), tag("/")))), parse_factor),
+        || init.clone(),
+        |acc, (op, value)| {
+            let bin_op = match op {
+                "*" => BinOp::Mul,
+                "/" => BinOp::Div,
+                _   => unreachable!(),
+            };
+            Expr::Binary(Box::new(acc), bin_op, Box::new(value))
+        }
+    )(input)
+}
+
+
+// parse_add_sub: handle addition and subtraction.
+fn parse_add_sub(input: &str) -> IResult<Expr> {
+    let (input, init) = parse_term(input)?;
+    fold_many0(
+        pair(ws(alt((tag("+"), tag("-")))), parse_term),
+        || init.clone(),
+        |acc, (op, value)| {
+            let bin_op = match op {
+                "+" => BinOp::Add,
+                "-" => BinOp::Sub,
+                _   => unreachable!(),
+            };
+            Expr::Binary(Box::new(acc), bin_op, Box::new(value))
+        }
+    )(input)
+}
+
+
+// parse_arithmetic: our top-level arithmetic parser.
+fn parse_arithmetic(input: &str) -> IResult<Expr> {
+    parse_add_sub(input)
+}
+
 // Parse any expression by trying each possibility in order.
 fn parse_expr(input: &str) -> IResult<Expr> {
     alt((
@@ -369,6 +429,7 @@ fn parse_expr(input: &str) -> IResult<Expr> {
         parse_closure,
         parse_get,
         parse_call,
+        parse_arithmetic,
         parse_constant,
     ))(input)
 }

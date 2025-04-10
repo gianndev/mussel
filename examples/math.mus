@@ -1,0 +1,11 @@
+let a = 2 + 1
+let b = 6 - 1
+let c = 2 * 1
+let d = 12 / 1
+let math = 1 + 1
+
+println(a)
+println(b)
+println(c)
+println(d)
+println(math)
