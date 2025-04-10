@@ -1,6 +1,6 @@
 # Changelog
 
-## x.x.x (xxxx-xx-xx)
+## 0.0.4 (2025-04-10)
 - Added `input()` function to interact with the user via terminal
 - Added the `until` loop, which is the equivalent of the *while loop* in many languages
 - Added the ability to define variables as results of mathematical expressions (like "5+3" is now possible instead of just "8")
