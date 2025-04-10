@@ -32,6 +32,14 @@ let greet = "Hello dude!"
 println(greet)
 ```
 
+## input() function
+To allow a user to enter data and have this data saved in a variable, the `input()` function is used
+
+```
+let name = input("Enter your name: ")
+println("Hello {name}")
+```
+
 ## Conditionals: *if* and *else*
 Conditionals are represented by the keywords `if` and `else`, followed by the condition and then curly braces are needed to contain the part of the code that is executed if the condition is met
 
