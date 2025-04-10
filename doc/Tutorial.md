@@ -79,6 +79,18 @@ for num in numbers {
 }
 ```
 
+## *until* loop
+The until loop executes a code as long as a given condition is true: it is the equivalent of the *while loop* in Mussel (in fact i think *until* is a better key-word than *while*)
+
+```
+let variable = 1
+
+until variable != 1 {
+    println("PRINTED")
+    let variable = 2
+}
+```
+
 ## Arrays
 Arrays are defined with square brackets and elements separated by commas. You can access elements using the Get expression (using square brackets after a variable name).
 

@@ -2,6 +2,7 @@
 
 ## x.x.x (xxxx-xx-xx)
 - Added `input()` function to interact with the user via terminal
+- Added the `until` loop, which is the equivalent of the *while loop* in many languages
 
 ## 0.0.3 (2025-04-09)
 - Added `else if` as condition

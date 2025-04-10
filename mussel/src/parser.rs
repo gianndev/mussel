@@ -179,6 +179,7 @@ pub enum Expr {
     Return(Box<Expr>), // A return expression.
     For(String, Box<Expr>, Vec<Expr>), // A for loop iterating over a collection.
     Get(String, usize), // Access an element in an array by name and index.
+    Until(Box<Expr>, Vec<Expr>), // An until loop: execute the body until the condition becomes true.
 }
 
 // Implement Display for Expr so that it can be printed.
@@ -345,12 +346,22 @@ fn parse_get(input: &str) -> IResult<Expr> {
     map(parser, |(name, index)| Expr::Get(name, index))(input)
 }
 
+fn parse_until(input: &str) -> IResult<Expr> {
+    let (input, _) = tag("until")(input)?;
+    let (input, _) = skip_ws_comments(input)?;
+    let (input, condition) = parse_expr(input)?;
+    let (input, _) = skip_ws_comments(input)?;
+    let (input, body) = delimited(tag("{"), ws(many0(parse_expr)), tag("}"))(input)?;
+    Ok((input, Expr::Until(Box::new(condition), body)))
+}
+
 // Parse any expression by trying each possibility in order.
 fn parse_expr(input: &str) -> IResult<Expr> {
     alt((
         parse_return,
         parse_function,
         parse_for,
+        parse_until,
         parse_if,
         parse_let,
         parse_compare,

@@ -247,5 +247,22 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             Some(invalid) => panic!("Expected array, got {invalid}"),
             None => panic!("Couldn't find {name}"),
         },
+        Expr::Until(condition, body) => {
+            // Loop until the condition evaluates to true.
+            loop {
+                // Evaluate the condition. Clone the condition so it can be used repeatedly.
+                let cond_result = interpreter_expr((*condition).clone(), context);
+                // Expect the condition to yield a boolean.
+                if let Expr::Constant(Atom::Boolean(true)) = cond_result {
+                    break;
+                }
+                // Otherwise, run each expression in the body.
+                // We clone the body because it may be re-used in further iterations.
+                for expr in body.clone() {
+                    interpreter_expr(expr, context);
+                }
+            }
+            Expr::Void
+        }        
     }
 }
