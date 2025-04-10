@@ -157,11 +157,31 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         // Evaluate a function call.
         Expr::Call(name, args) => {
             if name == "println" {
-                // Special case for the built-in "println" function.
+                // Built-in println: evaluate and print each argument.
                 for arg in args {
-                    print!("{}", interpreter_expr(arg, context)); // Print each argument after evaluating.
+                    print!("{}", interpreter_expr(arg, context));
                 }
-                print!("\n"); // Print a newline.
+                println!();
+            } else if name == "input" {
+                // Built-in input: optionally print a prompt and wait for user input.
+                // If an argument is provided, evaluate it and convert to a string prompt.
+                let prompt = if !args.is_empty() {
+                    interpreter_expr(args[0].clone(), context).to_string()
+                } else {
+                    String::new()
+                };
+                // Print the prompt without a newline.
+                print!("{}", prompt);
+                // Flush stdout to ensure the prompt appears.
+                use std::io::{self, Write};
+                io::stdout().flush().expect("Failed to flush stdout");
+                // Read a line from stdin.
+                let mut input_text = String::new();
+                io::stdin().read_line(&mut input_text).expect("Failed to read line");
+                // Trim trailing newline characters.
+                let input_text = input_text.trim_end().to_string();
+                // Return the input as a string atom.
+                return Expr::Constant(Atom::String(input_text));
             } else {
                 // For other function calls, look up the function in the context.
                 match context.get(&name) {

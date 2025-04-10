@@ -377,5 +377,7 @@ pub fn parse_interpolation(input: &str) -> IResult<Vec<Expr>> {
 // The final parser function that ties all the sub-parsers together.
 // It applies the expression parser repeatedly until the entire input is consumed.
 pub fn parser(input: &str) -> Result<Vec<Expr>, ErrorTree<&str>> {
-    final_parser(many0(ws(parse_expr)))(input)
+    // Wrap each expression so that it optionally ends with a semicolon.
+    let statement = ws(terminated(parse_expr, opt(ws(tag(";")))));
+    final_parser(many0(statement))(input)
 }

@@ -35,3 +35,9 @@ An example demonstrating how conditions work and in particular the latest `else 
 ### if_tests.mus
 
 An example demonstrating some tests with the `if` loops, comparing variables in different ways
+
+---
+
+### input.mus
+
+Contains examples on how to use the *input()* function in Mussel code
