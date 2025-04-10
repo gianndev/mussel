@@ -15,3 +15,9 @@ println(math)
 let first = 50
 let second = first + 5
 println(second)
+
+// --------------------------------------
+
+let third = 100
+let third = third / 5
+println(third)
