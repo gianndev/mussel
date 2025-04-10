@@ -9,3 +9,9 @@ println(b)
 println(c)
 println(d)
 println(math)
+
+// --------------------------------------
+
+let first = 50
+let second = first + 5
+println(second)
