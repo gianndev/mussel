@@ -149,6 +149,4 @@ let n = rand(1, 10)
 println("Your random number is {n}")
 ```
 
-Mussel's Standard Library currently consists of the following libraries:
-
-- random
+For detailed information on the individual libraries of the Standard Library, you can consult the dedicated file [here](/doc/Standard_Library.md).
