@@ -3,6 +3,7 @@
 ## x.x.x (xxxx-xx-xx)
 - Added `Standard Library` in Mussel with the `include` key-word
 - Added the `random` library as first library of the Mussel Standard Library
+- Added detailed documentation for the Standard Library
 
 ## 0.0.4 (2025-04-10)
 - Added `input()` function to interact with the user via terminal

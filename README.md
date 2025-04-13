@@ -14,6 +14,8 @@ Mussel's interpreter is programmed in Rust, which means that Mussel offers the s
 
 You can find a detailed tutorial to learn how Mussel works [here](/doc/Tutorial.md).
 
+For detailed information on the individual libraries of the Standard Library, you can consult the dedicated file [here](/doc/Standard_Library.md).
+
 ## Practical Example
 
 You can find some examples of Mussel code in the [examples](/examples/) folder.
