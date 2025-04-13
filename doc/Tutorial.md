@@ -135,3 +135,20 @@ println("Hello") // prints a string
 ```
 
 ⚠️ *Multiline comments are not supported yet, but you can use `//` for multiple lines if necessary*
+
+## Standard Library
+
+In addition to all the stuff mentioned so far, which is included in "pure Mussel", it is possible to use external modules that allow you to extend the capabilities of Mussel, and which together represent the Mussel Standard Library.
+
+In a *.mus* file you can include a library thanks to the keyword `include`, which must be placed at the beginning of the code, followed by the name of the library you want to import
+
+```
+include random
+
+let n = rand(1, 10)
+println("Your random number is {n}")
+```
+
+Mussel's Standard Library currently consists of the following libraries:
+
+- random
