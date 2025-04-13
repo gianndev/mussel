@@ -1,6 +1,6 @@
 # Changelog
 
-## x.x.x (xxxx-xx-xx)
+## 0.0.5 (2025-04-13)
 - Added `Standard Library` in Mussel with the `include` key-word
 - Added the `random` library as first library of the Mussel Standard Library
 - Added detailed documentation for the Standard Library
