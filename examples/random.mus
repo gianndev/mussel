@@ -1,0 +1,4 @@
+include random
+
+let n = rand(1, 10)
+println("Your random number is {n}")

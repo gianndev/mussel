@@ -29,6 +29,7 @@ use color_eyre::{
 // Rust will look for "interpreter.rs" and "parser.rs" in the same directory.
 mod interpreter;
 mod parser;
+mod stdlib;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
 // The doc-comment (triple slash) describes the application when running the help command.

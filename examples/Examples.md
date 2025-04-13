@@ -53,3 +53,9 @@ Contains examples on how to use the *until* loop (which is the equivalent of the
 ### math.mus
 
 Contains examples on defining variables using math expressions
+
+---
+
+### random.mus
+
+Contains the Mussel code that uses a module inside the standard library to have a random integer

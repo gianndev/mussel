@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.5 (2025-04-13)
+- Added `Standard Library` in Mussel with the `include` key-word
+- Added the `random` library as first library of the Mussel Standard Library
+- Added detailed documentation for the Standard Library
+
 ## 0.0.4 (2025-04-10)
 - Added `input()` function to interact with the user via terminal
 - Added the `until` loop, which is the equivalent of the *while loop* in many languages

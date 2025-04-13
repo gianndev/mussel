@@ -134,8 +134,8 @@ fn parse_boolean(input: &str) -> IResult<Atom> {
 fn parse_atom(input: &str) -> IResult<Atom> {
     alt((
         parse_string,
-        parse_float,
         parse_number,
+        parse_float,
         parse_boolean,
         parse_name,
     ))(input)
@@ -189,6 +189,8 @@ pub enum Expr {
     Get(String, usize), // Access an element in an array by name and index.
     Until(Box<Expr>, Vec<Expr>), // An until loop: execute the body until the condition becomes true.
     Binary(Box<Expr>, BinOp, Box<Expr>), // Binary arithmetic expression.
+    Include(String),
+    Builtin(fn(Vec<Expr>, &mut std::collections::HashMap<String, Expr>) -> Expr),
 }
 
 // Implement Display for Expr so that it can be printed.
@@ -414,9 +416,18 @@ fn parse_arithmetic(input: &str) -> IResult<Expr> {
     parse_add_sub(input)
 }
 
+fn parse_include(input: &str) -> IResult<Expr> {
+    // "include" keyword followed by whitespace and a library name
+    let (input, _) = tag("include")(input)?;
+    let (input, _) = ws(nom::combinator::success(()))(input)?;
+    let (input, lib_name) = parse_variable(input)?;
+    Ok((input, Expr::Include(lib_name)))
+}
+
 // Parse any expression by trying each possibility in order.
 fn parse_expr(input: &str) -> IResult<Expr> {
     alt((
+        parse_include,
         parse_return,
         parse_function,
         parse_for,
