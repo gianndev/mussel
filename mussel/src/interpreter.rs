@@ -156,60 +156,58 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         }
         // Evaluate a function call.
         Expr::Call(name, args) => {
-            if name == "println" {
-                // Built-in println: evaluate and print each argument.
-                for arg in args {
-                    print!("{}", interpreter_expr(arg, context));
-                }
-                println!();
-            } else if name == "input" {
-                // Built-in input: optionally print a prompt and wait for user input.
-                // If an argument is provided, evaluate it and convert to a string prompt.
-                let prompt = if !args.is_empty() {
-                    interpreter_expr(args[0].clone(), context).to_string()
-                } else {
-                    String::new()
-                };
-                // Print the prompt without a newline.
-                print!("{}", prompt);
-                // Flush stdout to ensure the prompt appears.
-                use std::io::{self, Write};
-                io::stdout().flush().expect("Failed to flush stdout");
-                // Read a line from stdin.
-                let mut input_text = String::new();
-                io::stdin().read_line(&mut input_text).expect("Failed to read line");
-                // Trim trailing newline characters.
-                let input_text = input_text.trim_end().to_string();
-                // Return the input as a string atom.
-                return Expr::Constant(Atom::String(input_text));
-            } else {
-                // For other function calls, look up the function in the context.
-                match context.get(&name) {
-                    Some(Expr::Closure(parameters, body)) => {
-                        // Create a new scope by cloning the current context.
+            // Evaluate arguments.
+            let evaluated_args: Vec<Expr> = args.into_iter()
+                .map(|arg| interpreter_expr(arg, context))
+                .collect();
+            // Check if the function name is one of the built-in ones.
+            if let Some(val) = context.get(&name) {
+                match val {
+                    Expr::Builtin(func) => {
+                        return func(evaluated_args, context)
+                    },
+                    Expr::Closure(parameters, body) => {
+                        // Existing closure call handling remains here.
                         let mut scope = context.clone();
-
-                        // Bind each function parameter to its corresponding argument.
-                        for (parameter, arg) in parameters.into_iter().zip(args.into_iter()) {
+                        for (parameter, arg) in parameters.into_iter().zip(evaluated_args.into_iter()) {
                             let expr = interpreter_expr(arg, &mut scope);
                             scope.insert(parameter.clone(), expr);
                         }
-
-                        // Evaluate each expression in the function body.
                         for expr in body {
-                            // If a return is encountered, unwrap and return its value.
                             if let Expr::Return(expr) = interpreter_expr(expr.clone(), &mut scope) {
                                 return *expr;
                             }
                         }
-                    }
-                    // If the function is not found or not callable, panic.
-                    _ => panic!("Function `{name}` doesn't exist."),
+                        return Expr::Void;
+                    },
+                    _ => { /* Fall through */ }
                 }
             }
-            // Function calls return void if no explicit return value is encountered.
-            Expr::Void
-        }
+            
+            // Special cases (like "println" and "input") remain unchanged.
+            if name == "println" {
+                for arg in evaluated_args {
+                    print!("{}", interpreter_expr(arg, context));
+                }
+                println!();
+                return Expr::Void;
+            } else if name == "input" {
+                let prompt = if !evaluated_args.is_empty() {
+                    interpreter_expr(evaluated_args[0].clone(), context).to_string()
+                } else {
+                    String::new()
+                };
+                print!("{}", prompt);
+                use std::io::{self, Write};
+                io::stdout().flush().expect("Failed to flush stdout");
+                let mut input_text = String::new();
+                io::stdin().read_line(&mut input_text).expect("Failed to read line");
+                let input_text = input_text.trim_end().to_string();
+                return Expr::Constant(Atom::String(input_text));
+            }
+            
+            panic!("Function `{name}` doesn't exist.");
+        },
         // Define a function by storing it as a closure in the context.
         Expr::Function(name, args, body) => {
             context.insert(name, Expr::Closure(args, body));
@@ -302,5 +300,18 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 _ => panic!("Arithmetic operations are only supported between numbers"),
             }
         } 
+        Expr::Include(lib) => {
+            if lib == "random" {
+                // Call the loader from your standard library module.
+                crate::stdlib::random::load(context);
+            } else {
+                panic!("Unknown library: {lib}");
+            }
+            Expr::Void
+        },
+        Expr::Builtin(func) => {
+            // Builtins are meant to be called; simply return them.
+            Expr::Builtin(func)
+        },
     }
 }
