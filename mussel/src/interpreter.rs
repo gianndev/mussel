@@ -302,8 +302,9 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         } 
         Expr::Include(lib) => {
             if lib == "random" {
-                // Call the loader from your standard library module.
                 crate::stdlib::random::load(context);
+            } else if lib == "string" {
+                crate::stdlib::string::load(context);
             } else {
                 panic!("Unknown library: {lib}");
             }
