@@ -5,6 +5,7 @@ This file contains a list of all the libraries in the Mussel Standard Library, a
 Mussel's Standard Library currently consists of the following libraries:
 
 - random
+- string
 
 ---
 
@@ -46,6 +47,68 @@ Your random number is 7
 - If you pass floating-point numbers, the result is still returned as an integer using rounding.
 - If `min` is greater than `max`, the program will panic.
 - Both arguments must be constants or evaluable expressions resulting in numeric values.
+
+---
+
+## string
+
+The `string` library provides utilities for manipulating and working with strings in Mussel programs. To use this library, you must include it at the top of your script with:
+
+```
+include string
+```
+
+### Functions
+
+#### `length(s)`
+
+Returns the length of the string `s`.
+
+- **Arguments:**
+  - `s`: a string whose length is to be calculated.
+- **Returns:** An integer representing the number of characters in the string.
+- **Example:**
+
+```mussel
+include string
+
+let len = length("hello")
+println("The length of the string is {len}")
+```
+
+This will output:
+
+```
+The length of the string is 5
+```
+
+#### `concat(s1, s2)`
+
+Concatenates two strings `s1` and `s2` and returns the result.
+
+- **Arguments:**
+  - `s1`: the first string.
+  - `s2`: the second string.
+- **Returns:** A new string that is the result of concatenating `s1` and `s2`.
+- **Example:**
+
+```mussel
+include string
+
+let fullName = concat("John", " Doe")
+println("Full name: {fullName}")
+```
+
+This will output:
+
+```
+Full name: John Doe
+```
+
+#### Notes:
+
+- Strings in Mussel are immutable, so operations like `concat` return a new string without modifying the originals.
+- Passing non-string arguments to these functions will result in a runtime error.
 
 ---
 

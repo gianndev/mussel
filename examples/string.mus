@@ -1,0 +1,6 @@
+include string
+
+let s = "Hello, World!"
+println(lowercase(s))  // Output: hello, world!
+println(uppercase(s))  // Output: HELLO, WORLD!
+println(length(s))     // Output: 13

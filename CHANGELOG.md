@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.0 (2025-04-17)
+- Added the `string` library in the Mussel Standard Library to manipulate strings
+
 ## 0.0.5 (2025-04-13)
 - Added `Standard Library` in Mussel with the `include` key-word
 - Added the `random` library as first library of the Mussel Standard Library
