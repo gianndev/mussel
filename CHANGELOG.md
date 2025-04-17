@@ -1,6 +1,6 @@
 # Changelog
 
-## x.x.x (xxxx-xx-xx)
+## 0.1.0 (2025-04-17)
 - Added the `string` library in the Mussel Standard Library to manipulate strings
 
 ## 0.0.5 (2025-04-13)
