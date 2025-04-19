@@ -305,6 +305,8 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 crate::stdlib::random::load(context);
             } else if lib == "string" {
                 crate::stdlib::string::load(context);
+            } else if lib == "time" {
+                crate::stdlib::time::load(context);
             } else {
                 panic!("Unknown library: {lib}");
             }

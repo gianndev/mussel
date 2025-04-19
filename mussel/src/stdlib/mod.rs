@@ -14,3 +14,4 @@
 
 pub mod random;
 pub mod string;
+pub mod time;
