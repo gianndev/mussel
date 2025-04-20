@@ -24,12 +24,14 @@ use color_eyre::{
     eyre::{eyre, WrapErr},
     Help, Result,
 };
+use nom_locate::LocatedSpan;
 
 // Declare the modules that are defined in separate files.
 // Rust will look for "interpreter.rs" and "parser.rs" in the same directory.
 mod interpreter;
 mod parser;
 mod stdlib;
+mod lexer;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
 // The doc-comment (triple slash) describes the application when running the help command.
@@ -55,12 +57,13 @@ fn main() -> Result<()> {
         .wrap_err(format!("Failed to read file: \"{file}\""))
         .suggestion("try using a file that exists")?;
 
+
+    let input = LocatedSpan::new_extra(input.as_str(), file.as_str());
+    let result = lexer::lex(input)?;
+    result.iter().for_each(|r| println!("{:?}", r));
+
     // Call the parser from the `parser` module to turn the input into expressions.
     // If parsing fails, convert the error into an eyre error with detailed debugging information.
-    let exprs =
-        parser::parser(&input).map_err(|error| eyre!("Error occurred while parsing: {error:#?}"))?;
-    // Pass the parsed expressions to the interpreter to evaluate them.
-    interpreter::interpreter(exprs);
 
     // Return success.
     Ok(())
