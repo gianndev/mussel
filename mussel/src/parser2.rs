@@ -1,7 +1,7 @@
 use color_eyre::eyre::eyre;
 use color_eyre::{Help, Report};
 use nom::multi::{many0, separated_list0};
-use nom::{Needed, Parser};
+use nom::{Parser};
 use nom::branch::alt;
 use nom::combinator::{cut, map, opt};
 use nom::error::ParseError;
@@ -248,7 +248,7 @@ fn expression_list(input: &[TokenRecord]) -> IResult<Vec<Expression>> {
     Ok((input, expr))
 }
 
-fn postFix(input: &[TokenRecord]) -> IResult<PostFixExpr> {
+fn post_fix(input: &[TokenRecord]) -> IResult<PostFixExpr> {
     let call = delimited(match_token(Token::LParenthesis), expression_list, match_token(Token::RParenthesis));
     let index = delimited(match_token(Token::LBracket), expr, match_token(Token::RBracket));
     alt((
@@ -260,7 +260,7 @@ fn postFix(input: &[TokenRecord]) -> IResult<PostFixExpr> {
 fn factor(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = object(input)?;
 
-    let (input, postfix) = many0(postFix)(input)?;
+    let (input, postfix) = many0(post_fix)(input)?;
 
     let mut left = left;
     for post in postfix {
