@@ -27,7 +27,7 @@ pub fn load(context: &mut HashMap<String, Expr>) {
 // Returns the current time in milliseconds since the Unix epoch.
 pub fn time_ms(args: Vec<Expr>, _context: &mut HashMap<String, Expr>) -> Expr {
     if args.len() != 0 {
-        panic!("get_time expects 0 arguments");
+        panic!("time_ms expects 0 arguments");
     }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -41,7 +41,7 @@ pub fn time_ms(args: Vec<Expr>, _context: &mut HashMap<String, Expr>) -> Expr {
 // Returns the current time in seconds since the Unix epoch.
 pub fn time_sec(args: Vec<Expr>, _context: &mut HashMap<String, Expr>) -> Expr {
     if args.len() != 0 {
-        panic!("get_time_seconds expects 0 arguments");
+        panic!("time_sec expects 0 arguments");
     }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
