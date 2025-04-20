@@ -32,6 +32,7 @@ mod interpreter;
 mod parser;
 mod stdlib;
 mod lexer;
+mod parser2;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
 // The doc-comment (triple slash) describes the application when running the help command.
@@ -58,9 +59,15 @@ fn main() -> Result<()> {
         .suggestion("try using a file that exists")?;
 
 
-    let input = LocatedSpan::new_extra(input.as_str(), file.as_str());
+    let file = file.as_str();
+    let program = input.as_str();
+    let input = LocatedSpan::new_extra(program, file);
     let result = lexer::lex(input)?;
     result.iter().for_each(|r| println!("{:?}", r));
+
+    let result1 = parser2::parser(&result).map_err(|e| e.create_report(file, program))?;
+
+    result1.iter().for_each(|r| println!("{:?}", r));
 
     // Call the parser from the `parser` module to turn the input into expressions.
     // If parsing fails, convert the error into an eyre error with detailed debugging information.

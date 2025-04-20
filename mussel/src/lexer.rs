@@ -2,6 +2,7 @@ extern crate nom;
 extern crate nom_locate;
 
 use std::error::Error;
+use std::ops::Range;
 use color_eyre::eyre::eyre;
 use color_eyre::{Report, Section};
 use nom::branch::alt;
@@ -16,7 +17,10 @@ use nom_locate::{position, LocatedSpan};
 use nom_supreme::error::{BaseErrorKind, ErrorTree};
 use nom_supreme::final_parser::final_parser;
 
-#[derive(Debug, PartialEq)]
+
+// Represents a type of Token
+// < byte, so trivial to copy
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Token {
     Plus,              // '+'
     Minus,             // '-'
@@ -38,6 +42,9 @@ pub(crate) enum Token {
     RBrace,            // '}'
     Comma,             // ','
     Bar,               // '|'
+    Or,                // '||'
+    And,               // '&&'
+    Bang,              // '!'
     Fn,                // 'fn'
     Include,           // 'include'
     For,               // 'for'
@@ -50,18 +57,32 @@ pub(crate) enum Token {
 
     Ignore, //Comment and Whitespace (should be filtered before lexing)
 
-    Integer(),
-    Float(),
-    Boolean(),
-    String(),
-    Identifier(),
+    Integer,
+    Float,
+    Boolean,
+    String,
+    Identifier,
 }
 
-#[derive(Debug)]
+// Represents an instance of a Token
+// Doesn't store data, only location, so copying is cheap
+#[derive(Debug, Clone)]
 pub(crate) struct TokenRecord {
-    token_type: Token,
-    offset: usize,
+    pub(crate) token_type: Token,
+    pub(crate) offset: usize,
     length: usize,
+}
+
+impl TokenRecord {
+
+    // use .chars() or just this?
+    pub(crate) fn get_content<'a>(&self, input: &'a str) -> &'a str {
+        &input[self.offset..self.offset + self.length]
+    }
+
+    pub fn range(&self) -> Range<usize> {
+        self.offset..self.offset + self.length
+    }
 }
 
 //remembers location and file
@@ -90,9 +111,9 @@ fn identifier(input: Span) -> IResult<Token> {
         "until" => Token::Until,
         "let" => Token::Let,
         "return" => Token::Return,
-        "true" => Token::Boolean(),
-        "false" => Token::Boolean(),
-        _ => Token::Identifier(),
+        "true" => Token::Boolean,
+        "false" => Token::Boolean,
+        _ => Token::Identifier,
     };
 
     Ok((input, token))
@@ -118,9 +139,9 @@ fn number(input: Span) -> IResult<Token> {
         recognize(pair(digit1, opt(pair(char('.'), digit1)))),
         |num_str: Span| {
             if num_str.contains('.') {
-                Ok::<Token, ErrorTree<&'_ str>>(Token::Float())
+                Ok::<Token, ErrorTree<&'_ str>>(Token::Float)
             } else {
-                Ok::<Token, ErrorTree<&'_ str>>(Token::Integer())
+                Ok::<Token, ErrorTree<&'_ str>>(Token::Integer)
             }
         },
     )(input)
@@ -128,31 +149,38 @@ fn number(input: Span) -> IResult<Token> {
 
 fn string_literal(input: Span) -> IResult<Token> {
     let (input, _) = delimited(char('"'), take_while(|c| c != '"'), char('"'))(input)?;
-    Ok((input, Token::String()))
+    Ok((input, Token::String))
 }
 
 fn simple_token(input: Span) -> IResult<Token> {
     alt((
-        map(tag("=="), |_| Token::EqualsEquals),
-        map(tag("!="), |_| Token::NotEquals),
-        map(tag("<="), |_| Token::LessThanEquals),
-        map(tag(">="), |_| Token::GreaterThanEquals),
-        map(tag("+"), |_| Token::Plus),
-        map(tag("-"), |_| Token::Minus),
-        map(tag("*"), |_| Token::Star),
-        map(tag("/"), |_| Token::RSlash),
-        map(tag("\\"), |_| Token::LSlash),
-        map(tag("="), |_| Token::Equals),
-        map(tag("<"), |_| Token::LessThan),
-        map(tag(">"), |_| Token::GreaterThan),
-        map(tag("("), |_| Token::LParenthesis),
-        map(tag(")"), |_| Token::RParenthesis),
-        map(tag("["), |_| Token::LBracket),
-        map(tag("]"), |_| Token::RBracket),
-        map(tag("{"), |_| Token::LBrace),
-        map(tag("}"), |_| Token::RBrace),
-        map(tag(","), |_| Token::Comma),
-        map(tag("|"), |_| Token::Bar),
+        alt((
+            map(tag("=="), |_| Token::EqualsEquals),
+            map(tag("!="), |_| Token::NotEquals),
+            map(tag("<="), |_| Token::LessThanEquals),
+            map(tag(">="), |_| Token::GreaterThanEquals),
+            map(tag("||"), |_| Token::Or),
+            map(tag("&&"), |_| Token::And),
+            map(tag("!"),  |_| Token::Bang),
+            map(tag("+"),  |_| Token::Plus),
+            map(tag("-"),  |_| Token::Minus),
+        )),
+        alt((
+            map(tag("*"),  |_| Token::Star),
+            map(tag("/"),  |_| Token::RSlash),
+            map(tag("\\"), |_|Token::LSlash),
+            map(tag("="),  |_| Token::Equals),
+            map(tag("<"),  |_| Token::LessThan),
+            map(tag(">"),  |_| Token::GreaterThan),
+            map(tag("("),  |_| Token::LParenthesis),
+            map(tag(")"),  |_| Token::RParenthesis),
+            map(tag("["),  |_| Token::LBracket),
+            map(tag("]"),  |_| Token::RBracket),
+            map(tag("{"),  |_| Token::LBrace),
+            map(tag("}"),  |_| Token::RBrace),
+            map(tag(","),  |_| Token::Comma),
+            map(tag("|"),  |_| Token::Bar),
+        ))
     ))(input)
 }
 
