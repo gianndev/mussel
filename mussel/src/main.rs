@@ -1,6 +1,8 @@
 // Copyright (c) 2025 Francesco Giannice
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
+use std::path;
+use std::path::Path;
 // Import the `FromArgs` trait from the `argh` crate for parsing command line arguments.
 use argh::FromArgs;
 
@@ -13,6 +15,7 @@ use color_eyre::{
     eyre::{eyre, WrapErr},
     Help, Result,
 };
+use crate::error::{FileError, FileIdentifier, FileSet, Reporter};
 
 // Declare the modules that are defined in separate files.
 // Rust will look for "interpreter.rs" and "parser.rs" in the same directory.
@@ -37,21 +40,60 @@ fn main() -> Result<()> {
     // The `?` operator propagates any error that might occur during installation.
     color_eyre::install()?;
 
+    println!("\n");
+    println!("\n");
+
     // Parse command-line arguments from the environment and destructure to extract `file`.
     let Args { file } = argh::from_env();
-    // Read the content of the file into a string.
-    // If reading fails, add a custom error message and a suggestion using `wrap_err` and `suggestion`.
-    let input = std::fs::read_to_string(&file)
-        .wrap_err(format!("Failed to read file: \"{file}\""))
-        .suggestion("try using a file that exists")?;
+
+    // Create a new `FileSet` instance to manage files.
+    let mut files = FileSet::new();
+
+    // Load the file specified in the command-line arguments into the `FileSet`.
+    // If loading fails, print the error using the `Reporter` and return early.
+    let input = match load_file(&mut files, &file) {
+        Ok(file_id) => file_id,
+        Err(error) => {
+            let reporter = Reporter::new(files);
+            reporter.report(error);
+            println!("\n");
+            println!("\n");
+            return Ok(());
+        }
+    };
+    // When the file is loaded successfully, retrieve its content.
+    let file_content = files.get_content(input).unwrap_or_else(|| {
+        // This should never happen. Every FileIdentifier should be valid.
+        panic!("Failed to retrieve content");
+    });
 
     // Call the parser from the `parser` module to turn the input into expressions.
     // If parsing fails, convert the error into an eyre error with detailed debugging information.
     let exprs =
-        parser::parser(&input).map_err(|error| eyre!("Error occurred while parsing: {error:#?}"))?;
+        parser::parser(file_content).map_err(|error| eyre!("Error occurred while parsing: {error:#?}"))?;
     // Pass the parsed expressions to the interpreter to evaluate them.
     interpreter::interpreter(exprs);
 
     // Return success.
     Ok(())
+}
+
+
+fn load_file<P: AsRef<Path>>(files: &mut FileSet, path: P) -> Result<FileIdentifier, FileError> {
+    let path = path.as_ref();
+    let input = std::fs::read_to_string(path.to_path_buf());
+    let path_qualified = path::absolute(path.to_path_buf()).unwrap_or(path.to_path_buf());
+    match input {
+        Ok(content) => {
+            let file_id = files.add_file(path_qualified, content);
+            Ok(file_id)
+        }
+        Err(err) => {
+            Err(FileError::new(
+                path_qualified,
+                format!("Failed to read file: {}", err),
+            ))
+        }
+    }
+
 }

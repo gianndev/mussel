@@ -8,6 +8,8 @@ use codespan_reporting::{
 };
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
+/// Represents a set of files and their content.
+/// Only one of these should exist at a time.
 pub struct FileSet {
     files: SimpleFiles<FilePath, String>
 }
@@ -20,7 +22,7 @@ impl FileSet {
     }
 
     pub fn add_file<P: AsRef<Path>>(&mut self, path: P, content: String) -> FileIdentifier {
-        let id = self.files.add(FilePath { path: path.as_ref().to_path_buf() }, content);
+        let id = self.files.add(FilePath::new(path), content);
         FileIdentifier(id)
     }
 
@@ -35,6 +37,7 @@ impl FileSet {
 }
 
 /// File identifier used to lookup files in the `FileSet`.
+/// Every file identifier points to a valid file.
 #[derive(Clone, Copy, Debug)]
 pub struct FileIdentifier(usize);
 
@@ -42,6 +45,20 @@ pub struct FileIdentifier(usize);
 #[derive(Clone)]
 pub struct FilePath {
     path: PathBuf,
+}
+
+impl FilePath {
+    fn new<P: AsRef<Path>>(path: P) -> FilePath {
+        FilePath {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+}
+
+impl AsRef<Path> for FilePath {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
 }
 
 impl Display for FilePath {
@@ -136,5 +153,29 @@ impl LError for ErrorCollection {
             diagnostics.extend(error.report());
         }
         diagnostics
+    }
+}
+
+
+pub struct FileError {
+    path: FilePath,
+    message: String,
+}
+
+impl FileError {
+    pub fn new<P: AsRef<Path>>(path: P, message: String) -> Self {
+        FileError {
+            path: FilePath::new(path),
+            message
+        }
+    }
+}
+
+impl LError for FileError {
+    fn report(&self) -> Vec<Diagnostic<usize>> {
+        let diagnostic = Diagnostic::error()
+            .with_message(self.message.clone())
+            .with_notes(vec![format!("File: {}", self.path)]);
+        vec![diagnostic]
     }
 }
