@@ -305,7 +305,6 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             }
             Expr::Void
         },
-        // ...existing code...
         Expr::Builtin(func) => {
             // Builtins are meant to be called; simply return them.
             Expr::Builtin(func)
