@@ -296,11 +296,14 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 crate::stdlib::string::load(context);
             } else if lib == "time" {
                 crate::stdlib::time::load(context);
+            } else if lib == "math" {
+                crate::stdlib::math::load(context);
             } else {
                 panic!("Unknown library: {lib}");
             }
             Expr::Void
         },
+        // ...existing code...
         Expr::Builtin(func) => {
             // Builtins are meant to be called; simply return them.
             Expr::Builtin(func)

@@ -7,6 +7,7 @@ Mussel's Standard Library currently consists of the following libraries:
 - random
 - string
 - time
+- math
 
 ---
 
@@ -163,6 +164,72 @@ println("Operation took {delta} seconds")
 
 - This library is still in development and more functions may be added in the future.
 - There will be more functionality for handling dates and times, such as formatting and parsing.
+
+---
+
+## math
+
+The `math` library provides basic arithmetic and mathematical functions for Mussel programs. To use this library, include it at the top of your script with:
+
+```
+include math
+```
+
+### Functions
+
+#### `abs(x)`
+
+Returns the absolute value of the numeric value `x`.
+
+- **Arguments:**
+  - `x`: a number (integer or float)
+- **Returns:** The absolute value of `x`
+- **Example:**
+
+```mussel
+include math
+
+let a = abs(-15)
+println("The absolute value is {a}")
+```
+
+#### `sqrt(x)`
+
+Returns the square root of the numeric value `x`.
+
+- **Arguments:**
+  - `x`: a number (integer or float)
+- **Returns:** A floating-point number representing the square root of `x`
+- **Example:**
+
+```mussel
+include math
+
+let root = sqrt(25)
+println("Square root of 25 is {root}")
+```
+
+#### `pow(base, exponent)`
+
+Raises a number `base` to the power of `exponent`.
+
+- **Arguments:**
+  - `base`: a numeric value (integer or float)
+  - `exponent`: a numeric value (integer or float)
+- **Returns:** A floating-point number representing the result of `base` raised to the power of `exponent`
+- **Example:**
+
+```mussel
+include math
+
+let power = pow(2, 3)
+println("2 to the power of 3 is {power}")
+```
+
+#### Notes:
+
+- Ensure the arguments provided to these functions are numeric values; otherwise, a runtime error may occur.
+- The `sqrt` function always returns a floating-point number.
 
 ---
 
