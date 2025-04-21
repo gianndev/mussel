@@ -8,85 +8,99 @@ use nom::error::ParseError;
 use nom::sequence::{delimited, tuple};
 use nom_locate::LocatedSpan;
 use crate::lexer::{Token, TokenRecord};
-/*
 
-unit ::= expr*
 
-expr ::= include
-    | return
-    | function
-    | for
-    | until
-    | if
-    | let
-    | conditionalOrExpression
 
-include ::= 'include' id
-return ::= 'return' expr
-function ::= 'fn' id '(' (id (',' id)*)? ')' block
-for ::= 'for' id 'in' expr block
-until ::= 'until' expr block
-if ::= 'if' expr block ('else' block)?
-let ::= 'let' id '=' expr
+/// This is the main parser for the language.
+/// It takes a slice of tokens and returns an AST.
+///
+///
+///
+/// # Grammar
+///
+/// ```
+/// // Entry point
+/// unit ::= expr*
+///
+/// expr ::= include
+///     | return
+///     | function
+///     | for
+///     | until
+///     | if
+///     | let
+///     | conditionalOrExpression
+///
+/// include ::= 'include' id
+/// return ::= 'return' expr
+/// function ::= 'fn' id '(' (id (',' id)*)? ')' block
+/// for ::= 'for' id 'in' expr block
+/// until ::= 'until' expr block
+/// if ::= 'if' expr block ('else' block)?
+/// let ::= 'let' id '=' expr
+///
+/// block ::= '{' expr* '}'
+///
+/// // Math precedence
+/// conditionalOrExpression: conditionalAndExpression ('||' conditionalOrExpression)?;
+/// conditionalAndExpression: equalityExpression ('&&' conditionalAndExpression)?;
+/// equalityExpression: relationalExpression (('==' | '!=') equalityExpression)?;
+/// relationalExpression: additiveExpression (('<' | '>' | '<=' | '>=') relationalExpression)?;
+/// additiveExpression: multiplicativeExpression (('+' | '-') additiveExpression)?;
+/// multiplicativeExpression: unaryExpression (('*' | '/') multiplicativeExpression)?;
+/// unaryExpression: ('-' | '!')? factor;
+///
+/// factor: object postFix* ('=' expr)?;
+/// // calls and array indexing
+/// postFix: '(' expressionList ')' | '[' expr ']';
+/// expressionList: (expr (',' expr)*)?;
+///
+/// // lowest expression
+/// object: array | closure | string | integer | float | bool | id | '(' expr ')'
+///
+/// array ::= '[' (expr (',' expr)*)? ']'
+/// closure ::= '|' (id (',' id)*)? '|' block
+///
+/// # literals
+/// id ::= 'id'
+/// string ::= 'string'
+/// integer ::= 'integer'
+/// float ::= 'float'
+/// bool ::= 'true' | 'false'
+/// ```
 
-block ::= '{' expr* '}'
 
-conditionalOrExpression: conditionalAndExpression ('||' conditionalOrExpression)?;
-conditionalAndExpression: equalityExpression ('&&' conditionalAndExpression)?;
-equalityExpression: relationalExpression (('==' | '!=') equalityExpression)?;
-relationalExpression: additiveExpression (('<' | '>' | '<=' | '>=') relationalExpression)?;
-additiveExpression: multiplicativeExpression (('+' | '-') additiveExpression)?;
-multiplicativeExpression: unaryExpression (('*' | '/') multiplicativeExpression)?;
-unaryExpression: ('-' | '!')? factor;
 
-factor: object postFix* ('=' expr)?;
-postFix: '(' expressionList ')' | '[' expr ']';
-
-object: array | closure | string | integer | float | bool | id | '(' expr ')'
-
-expressionList: (expr (',' expr)*)?;
-
-array ::= '[' (expr (',' expr)*)? ']'
-closure ::= '|' (id (',' id)*)? '|' block
-
-//constants (with regex, just examples)
-id ::= [a-zA-Z_][a-zA-Z0-9_]*
-string ::= ".*"
-integer ::= (-)? [0-9]+
-float ::= (-)? [0-9]* \. [0-9]*
-bool ::= 'true' | 'false'
-
-*/
-
+/// Defines a custom Result type with the input of TokenRecords and the custom ErrorType
 type IResult<'a, O> = nom::IResult<&'a [TokenRecord], O, ErrorKind>;
+
+/// Used to define where an Expression was defined. Currently not used.
 type Range = core::ops::Range<usize>;
 
-fn match_token<'a>(expected: Token) -> impl Fn(&'a [TokenRecord]) -> IResult<&'a TokenRecord> {
-    move |input: &'a [TokenRecord]| {
-        if let Some((first, rest)) = input.split_first() {
-            if first.token_type == expected {
-                Ok((rest, first))
-            } else {
-                Err(nom::Err::Error(ErrorKind::UnexpectedToken {
-                    found: first.clone(),
-                    expected,
-                }))
-            }
-        } else {
-            Err(nom::Err::Error(ErrorKind::Eof))
-        }
-    }
-}
 
+/// Custom Error Type for better error reporting
+/// `self.get_offset` returns where the error occurred in the input stream (character index)
+/// `self.to_string` returns a readable error message.
+///
+/// implements `ParseError` to use as a nom error
 pub(crate) enum ErrorKind {
+
+    // Unexpected Token
     UnexpectedToken { found: TokenRecord, expected: Token },
+
+    // Fallback when the parser reaches the end of the input
     Eof,
+
+    // When not all tokens where consumed
     UnexpectedEndOfInput { record: TokenRecord },
+
+    // nom::error::ErrorKind is the standard nom error, needed for ParseError
     Internal { record: TokenRecord, kind: nom::error::ErrorKind },
+
+    // Combining multiple errors
+    // fixme: This might not be useful for the user in the future
     List(Vec<ErrorKind>)
 }
-
-
 
 impl<'a> ParseError<&'a [TokenRecord]> for ErrorKind {
     fn from_error_kind(input: &'a [TokenRecord], kind: nom::error::ErrorKind) -> Self {
@@ -109,8 +123,7 @@ impl<'a> ParseError<&'a [TokenRecord]> for ErrorKind {
         } else {
             ErrorKind::Eof
         };
-        ErrorKind::List(vec![other, fst])
-
+        ErrorKind::List(vec![fst, other])
     }
 
     fn from_char(input: &'a [TokenRecord], _c: char) -> Self {
@@ -130,6 +143,8 @@ impl<'a> ParseError<&'a [TokenRecord]> for ErrorKind {
 }
 
 impl ErrorKind {
+
+    /// Returns the offset of the error in the input stream (character index)
     fn get_offset(&self, max: usize) -> usize {
         match self {
             ErrorKind::UnexpectedToken { found, expected: _ } => found.offset,
@@ -140,21 +155,7 @@ impl ErrorKind {
         }
     }
 
-    pub(crate) fn create_report(self, file: &str, file_content: &str) -> Report {
-
-        let location = self.get_offset(file_content.len());
-        let span = unsafe { LocatedSpan::new_from_raw_offset(location, 0, file_content, ()) };
-
-        let kind = self.to_string();
-        let line = span.location_line();
-        let column = span.get_column();
-
-        let code = file_content;
-        let code = format!("{:?}", code.to_string());
-        eyre!("Error occurred while parsing '{kind}' {file}:{line}:{column}").with_section(move || code)
-
-    }
-
+    /// Returns a human-readable error message
     fn to_string(self) -> String {
         match self {
             ErrorKind::UnexpectedToken { found, expected } => {
@@ -176,6 +177,23 @@ impl ErrorKind {
                 result
             }
         }
+    }
+
+    /// Creates an eyre Error report with the error message and the code snippet, along with the
+    /// source location
+    pub(crate) fn create_report(self, file: &str, file_content: &str) -> Report {
+
+        let location = self.get_offset(file_content.len());
+        let span = unsafe { LocatedSpan::new_from_raw_offset(location, 0, file_content, ()) };
+
+        let kind = self.to_string();
+        let line = span.location_line();
+        let column = span.get_column();
+
+        let code = file_content;
+        let code = format!("{:?}", code.to_string());
+        eyre!("Error occurred while parsing '{kind}' {file}:{line}:{column}").with_section(move || code)
+
     }
 
 }
@@ -229,19 +247,54 @@ pub(crate) enum Expression {
     Index { left: Box<Expression>, index: Box<Expression> },
 }
 
+
+/// Represents a Call or Index. This is turned into a `Expression` in the `factor` method
+/// The Call and Index expression store the left side of the expression, so this extra step is
+/// needed to satisfy the borrow checker.
 enum PostFixExpr {
     Call(Vec<Expression>),
     Index(Box<Expression>),
 }
 
-impl PostFixExpr {
-     fn apply(self, left: Expression) -> Expression {
-         match self {
-             PostFixExpr::Call(args) => Expression::Call { left: Box::new(left), args },
-             PostFixExpr::Index(index) => Expression::Index { left: Box::new(left), index },
-         }
-     }
+
+
+/// This Function test for a specific token type.
+fn match_token<'a>(expected: Token) -> impl Fn(&'a [TokenRecord]) -> IResult<&'a TokenRecord> {
+    move |input: &'a [TokenRecord]| {
+        if let Some((first, rest)) = input.split_first() {
+            if first.token_type == expected {
+                Ok((rest, first))
+            } else {
+                Err(nom::Err::Error(ErrorKind::UnexpectedToken {
+                    found: first.clone(),
+                    expected,
+                }))
+            }
+        } else {
+            Err(nom::Err::Error(ErrorKind::Eof))
+        }
+    }
 }
+
+
+/// Main entry function for the parser
+pub fn parser(input: &[TokenRecord]) -> Result<Vec<Expression>, ErrorKind> {
+    match unit(input) {
+        Ok((left, expr)) =>
+            if !left.is_empty() {
+                Err(ErrorKind::UnexpectedEndOfInput {record: left[0].clone() })
+            } else {
+                Ok(expr)
+            }
+        Err(err) => match err {
+            nom::Err::Incomplete(_) => Err(ErrorKind::Eof),
+            nom::Err::Error(e) => Err(e),
+            nom::Err::Failure(e) => Err(e)
+        }
+    }
+}
+
+// <editor-fold desc="Rules">
 
 fn expression_list(input: &[TokenRecord]) -> IResult<Vec<Expression>> {
     let (input, expr) = separated_list0(match_token(Token::Comma), expr)(input)?;
@@ -262,9 +315,16 @@ fn factor(input: &[TokenRecord]) -> IResult<Expression> {
 
     let (input, postfix) = many0(post_fix)(input)?;
 
+    fn apply(expr: PostFixExpr, left: Expression) -> Expression {
+        match expr {
+            PostFixExpr::Call(args) => Expression::Call { left: Box::new(left), args },
+            PostFixExpr::Index(index) => Expression::Index { left: Box::new(left), index },
+        }
+    }
+
     let mut left = left;
     for post in postfix {
-        left = post.apply(left);
+        left = apply(post, left);
     }
 
     let (input, assign) = opt(tuple((
@@ -287,7 +347,7 @@ fn factor(input: &[TokenRecord]) -> IResult<Expression> {
 fn unary_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, op) = opt(alt((
         map(match_token(Token::Minus), |_| UnaryOperator::Negate),
-        map(match_token(Token::Bang), |_| UnaryOperator::Not),
+        map(match_token(Token::Not), |_| UnaryOperator::Not),
     )))(input)?;
     let (input, expr) = factor(input)?;
     if let Some(op) = op {
@@ -386,13 +446,13 @@ fn equality_expression(input: &[TokenRecord]) -> IResult<Expression> {
 fn conditional_and_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = equality_expression(input)?;
     let (input, right) = opt(tuple((
-        match_token(Token::And),
+        map(match_token(Token::And), |_| BinaryOperator::And),
         conditional_and_expression
     )))(input)?;
-    if let Some((_, right)) = right {
+    if let Some((op, right)) = right {
         Ok((input, Expression::Binary {
             left: Box::new(left),
-            operator: BinaryOperator::And,
+            operator: op,
             right: Box::new(right)
         }))
     } else {
@@ -402,13 +462,13 @@ fn conditional_and_expression(input: &[TokenRecord]) -> IResult<Expression> {
 fn conditional_or_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = conditional_and_expression(input)?;
     let (input, right) = opt(tuple((
-        match_token(Token::Or),
+        map(match_token(Token::Or), |_| BinaryOperator::Or),
         conditional_or_expression
     )))(input)?;
-    if let Some((_, right)) = right {
+    if let Some((op, right)) = right {
         Ok((input, Expression::Binary {
             left: Box::new(left),
-            operator: BinaryOperator::Or,
+            operator: op,
             right: Box::new(right)
         }))
     } else {
@@ -543,18 +603,4 @@ fn unit(input: &[TokenRecord]) -> IResult<Vec<Expression>> {
     many0(expr)(input)
 }
 
-pub fn parser(input: &[TokenRecord]) -> Result<Vec<Expression>, ErrorKind> {
-    match unit(input) {
-        Ok((left, expr)) =>
-            if !left.is_empty() {
-                Err(ErrorKind::UnexpectedEndOfInput {record: left[0].clone() })
-            } else {
-                Ok(expr)
-            }
-        Err(err) => match err {
-            nom::Err::Incomplete(_) => Err(ErrorKind::Eof),
-            nom::Err::Error(e) => Err(e),
-            nom::Err::Failure(e) => Err(e)
-        }
-    }
-}
+// </editor-fold>
