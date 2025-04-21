@@ -95,14 +95,21 @@ impl TokenRecord {
 pub type Span<'a> = LocatedSpan<&'a str, &'a str>;
 type IResult<'a, O> = nom::IResult<Span<'a>, O, ErrorTree<Span<'a>>>;
 
+
+/// Identifier start check
+/// Matches the following regex: [a-zA-Z_]
 fn is_ident_start(c: char) -> bool {
     c.is_ascii_alphabetic() || c == '_'
 }
 
+
+/// Identifier continue check, (after first character)
+/// Matches the following regex: [a-zA-Z0-9_]
 fn is_ident_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
+/// Tests for identifiers and keywords.
 fn identifier(input: Span) -> IResult<Token> {
     let (input, ident) =
         recognize(pair(take_while1(is_ident_start), take_while(is_ident_char)))(input)?;
@@ -128,10 +135,12 @@ fn identifier(input: Span) -> IResult<Token> {
     Ok((input, token))
 }
 
+/// Tests for whitespace. Will be filtered out
 fn whitespace(input: Span) -> IResult<Token> {
     map(multispace1, |_| Token::Ignore)(input)
 }
 
+/// Tests for comments. Will be filtered out
 fn comment(input: Span) -> IResult<Token> {
     alt((
         map(delimited(tag("//"), take_until("\n"), tag("\n")), |_| {
@@ -143,6 +152,8 @@ fn comment(input: Span) -> IResult<Token> {
     ))(input)
 }
 
+/// Tests a number literal.
+/// Matches the following regex: [0-9]+(\.[0-9]+)?
 fn number(input: Span) -> IResult<Token> {
     map_res(
         recognize(pair(digit1, opt(pair(char('.'), digit1)))),
@@ -156,11 +167,13 @@ fn number(input: Span) -> IResult<Token> {
     )(input)
 }
 
+/// Tests a string starting and ending with double quotes.
 fn string_literal(input: Span) -> IResult<Token> {
     let (input, _) = delimited(char('"'), take_while(|c| c != '"'), char('"'))(input)?;
     Ok((input, Token::String))
 }
 
+/// Tests for other symbols literals
 fn simple_token(input: Span) -> IResult<Token> {
         alt((
             map(tag("=="), |_| Token::EqualsEquals),
@@ -186,6 +199,8 @@ fn simple_token(input: Span) -> IResult<Token> {
         ))(input)
 }
 
+/// Matches exactly one token.
+/// Combines the token type with the location into a `TokenRecord`.
 fn one_token(input: Span) -> IResult<TokenRecord> {
    let start = position(input)?.0;
     let result = alt((
@@ -205,7 +220,8 @@ fn one_token(input: Span) -> IResult<TokenRecord> {
     Ok((result.0, as_record))
 }
 
-// top parser: parse *many* tokens
+/// Parses all tokens
+/// Filters out whitespace and comments
 fn tokens(input: Span) -> IResult<Vec<TokenRecord>> {
     many0(one_token)(input).map(|(span, vec)| {
 
@@ -219,10 +235,15 @@ fn tokens(input: Span) -> IResult<Vec<TokenRecord>> {
     })
 }
 
+/// Main entry point for the lexer.
 pub fn lex(input: Span) -> Result<Vec<TokenRecord>, Report> {
     final_parser(tokens)(input).map_err(|e| format_error(e))
 }
 
+
+// <editor-fold desc="Error handling">
+
+/// Converts a nom error into an eyre Report.
 fn format_error(error: ErrorTree<Span>) -> Report {
     let base = match error {
         ErrorTree::Base { location, kind } => {
@@ -252,3 +273,5 @@ fn generate_report(location: Span, kind: BaseErrorKind<&str, Box<dyn Error+Send+
     let code = format!("{:?}", code.to_string());
     eyre!("Error occurred while parsing '{kind}' {file}:{line}:{column}").with_section(move || code)
 }
+
+// </editor-fold>

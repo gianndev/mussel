@@ -65,9 +65,9 @@ fn main() -> Result<()> {
     let result = lexer::lex(input)?;
     result.iter().for_each(|r| println!("{:?}", r));
 
-    let result1 = parser2::parser(&result).map_err(|e| e.create_report(file, program))?;
+    let expressions = parser2::parser(&result).map_err(|e| e.create_report(file, program))?;
 
-    result1.iter().for_each(|r| println!("{:?}", r));
+    expressions.iter().for_each(|r| println!("{:?}", r));
 
     // Call the parser from the `parser` module to turn the input into expressions.
     // If parsing fails, convert the error into an eyre error with detailed debugging information.
