@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Francesco Giannice
+// Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+
 use std::fmt::Display;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
