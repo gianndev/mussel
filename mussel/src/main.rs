@@ -19,6 +19,7 @@ use color_eyre::{
 mod interpreter;
 mod parser;
 mod stdlib;
+mod error;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
 // The doc-comment (triple slash) describes the application when running the help command.
