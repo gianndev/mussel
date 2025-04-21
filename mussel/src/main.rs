@@ -40,9 +40,6 @@ fn main() -> Result<()> {
     // The `?` operator propagates any error that might occur during installation.
     color_eyre::install()?;
 
-    println!("\n");
-    println!("\n");
-
     // Parse command-line arguments from the environment and destructure to extract `file`.
     let Args { file } = argh::from_env();
 
@@ -56,8 +53,6 @@ fn main() -> Result<()> {
         Err(error) => {
             let reporter = Reporter::new(files);
             reporter.report(error);
-            println!("\n");
-            println!("\n");
             return Ok(());
         }
     };
