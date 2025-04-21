@@ -8,6 +8,7 @@ Mussel's Standard Library currently consists of the following libraries:
 - string
 - time
 - math
+- os
 
 ---
 
@@ -230,6 +231,71 @@ println("2 to the power of 3 is {power}")
 
 - Ensure the arguments provided to these functions are numeric values; otherwise, a runtime error may occur.
 - The `sqrt` function always returns a floating-point number.
+
+---
+
+## os
+
+The `os` library provides functionalities for performing operating system-level operations in Mussel programs. To use this library, include it at the top of your script with:
+
+```
+include os
+```
+
+### Functions
+
+#### `getcwd()`
+
+Returns the current working directory as a string.
+
+- **Arguments:**
+  - None
+- **Returns:** A string representing the current working directory.
+- **Example:**
+
+```mussel
+include os
+
+let cwd = getcwd()
+println("Current working directory: {cwd}")
+```
+
+#### `listdir(path)`
+
+Lists all entries in the specified directory.
+
+- **Arguments:**
+  - `path`: a string representing the directory path.
+- **Returns:** An array of strings, each representing an entry (file or directory) in the specified path.
+- **Example:**
+
+```mussel
+include os
+
+let entries = listdir("c:/Users/mark")
+println("Directory entries: {entries}")
+```
+
+#### `exists(path)`
+
+Checks if a specified path exists.
+
+- **Arguments:**
+  - `path`: a string representing the file or directory path.
+- **Returns:** A boolean (`true` or `false`) indicating whether the path exists.
+- **Example:**
+
+```mussel
+include os
+
+let flag = exists("c:/Users/mark")
+println("Does the path exist? {flag}")
+```
+
+#### Notes:
+
+- Ensure the provided path is a valid string.
+- If the supplied path for `listdir` does not exist or is inaccessible, an error will be thrown.
 
 ---
 

@@ -298,6 +298,8 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 crate::stdlib::time::load(context);
             } else if lib == "math" {
                 crate::stdlib::math::load(context);
+            } else if lib == "os" {
+                crate::stdlib::os::load(context);
             } else {
                 panic!("Unknown library: {lib}");
             }
