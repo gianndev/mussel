@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
 // Import definitions from the parser module that are needed for evaluation.
-use crate::parser::{parse_interpolation, Atom, BinOp, Expr, Operator};
+use crate::parser::{Atom, BinOp, Expr, Operator, parse_interpolation};
+use core::panic;
 // Import the HashMap collection to maintain variable bindings.
 use std::collections::HashMap;
 
@@ -107,7 +108,10 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 ) => match operator {
                     Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
                     Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
-                    _ => panic!("Invalid comparison operator for booleans: {:?}. Use == or !=", operator),
+                    _ => panic!(
+                        "Invalid comparison operator for booleans: {:?}. Use == or !=",
+                        operator
+                    ),
                 },
                 // New branch for comparing strings.
                 (
@@ -117,11 +121,14 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 ) => match operator {
                     Operator::Equal => Expr::Constant(Atom::Boolean(left == right)),
                     Operator::NotEqual => Expr::Constant(Atom::Boolean(left != right)),
-                    _ => panic!("Invalid comparison operator for strings: {:?}. Use == or !=", operator),
+                    _ => panic!(
+                        "Invalid comparison operator for strings: {:?}. Use == or !=",
+                        operator
+                    ),
                 },
                 _ => panic!("Can't compare {left} or {right}"),
             }
-        },
+        }
         // Evaluate an if-statement.
         Expr::If(statement, then, otherwise) => {
             // Evaluate the condition expecting a boolean result.
@@ -146,19 +153,20 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         // Evaluate a function call.
         Expr::Call(name, args) => {
             // Evaluate arguments.
-            let evaluated_args: Vec<Expr> = args.into_iter()
+            let evaluated_args: Vec<Expr> = args
+                .into_iter()
                 .map(|arg| interpreter_expr(arg, context))
                 .collect();
             // Check if the function name is one of the built-in ones.
             if let Some(val) = context.get(&name) {
                 match val {
-                    Expr::Builtin(func) => {
-                        return func(evaluated_args, context)
-                    },
+                    Expr::Builtin(func) => return func(evaluated_args, context),
                     Expr::Closure(parameters, body) => {
                         // Existing closure call handling remains here.
                         let mut scope = context.clone();
-                        for (parameter, arg) in parameters.into_iter().zip(evaluated_args.into_iter()) {
+                        for (parameter, arg) in
+                            parameters.into_iter().zip(evaluated_args.into_iter())
+                        {
                             let expr = interpreter_expr(arg, &mut scope);
                             scope.insert(parameter.clone(), expr);
                         }
@@ -168,11 +176,11 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                             }
                         }
                         return Expr::Void;
-                    },
+                    }
                     _ => { /* Fall through */ }
                 }
             }
-            
+
             // Special cases (like "println" and "input") remain unchanged.
             if name == "println" {
                 for arg in evaluated_args {
@@ -190,13 +198,15 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 use std::io::{self, Write};
                 io::stdout().flush().expect("Failed to flush stdout");
                 let mut input_text = String::new();
-                io::stdin().read_line(&mut input_text).expect("Failed to read line");
+                io::stdin()
+                    .read_line(&mut input_text)
+                    .expect("Failed to read line");
                 let input_text = input_text.trim_end().to_string();
                 return Expr::Constant(Atom::String(input_text));
             }
-            
+
             panic!("Function `{name}` doesn't exist.");
-        },
+        }
         // Define a function by storing it as a closure in the context.
         Expr::Function(name, args, body) => {
             context.insert(name, Expr::Closure(args, body));
@@ -250,7 +260,7 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 }
             }
             Expr::Void
-        }       
+        }
         Expr::Binary(left_expr, op, right_expr) => {
             let left = interpreter_expr(*left_expr, context);
             let right = interpreter_expr(*right_expr, context);
@@ -269,7 +279,7 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                         }
                     };
                     Expr::Constant(Atom::Number(result))
-                },
+                }
                 // If you also want to support floating-point arithmetic, you can add a branch:
                 (Expr::Constant(Atom::Float(l)), Expr::Constant(Atom::Float(r))) => {
                     let result = match op {
@@ -285,10 +295,17 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                         }
                     };
                     Expr::Constant(Atom::Float(result))
-                },
+                }
+                (Expr::Constant(Atom::String(l)), Expr::Constant(Atom::String(r))) => {
+                    let result = match op {
+                        BinOp::Add => format!("{}{}", l, r),
+                        _ => panic!("Only '+' is supported by strings"),
+                    };
+                    Expr::Constant(Atom::String(result))
+                }
                 _ => panic!("Arithmetic operations are only supported between numbers"),
             }
-        } 
+        }
         Expr::Include(lib) => {
             if lib == "random" {
                 crate::stdlib::random::load(context);
@@ -304,10 +321,10 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 panic!("Unknown library: {lib}");
             }
             Expr::Void
-        },
+        }
         Expr::Builtin(func) => {
             // Builtins are meant to be called; simply return them.
             Expr::Builtin(func)
-        },
+        }
     }
 }
