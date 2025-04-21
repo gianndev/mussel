@@ -18,8 +18,8 @@ use nom_supreme::error::{BaseErrorKind, ErrorTree};
 use nom_supreme::final_parser::final_parser;
 
 
-// Represents a type of Token
-// < byte, so trivial to copy
+/// Represents a type of Token
+/// < byte, so trivial to copy
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Token {
     Plus,              // '+'
@@ -42,9 +42,6 @@ pub(crate) enum Token {
     RBrace,            // '}'
     Comma,             // ','
     Bar,               // '|'
-    Or,                // '||'
-    And,               // '&&'
-    Bang,              // '!'
     Fn,                // 'fn'
     Include,           // 'include'
     For,               // 'for'
@@ -54,8 +51,11 @@ pub(crate) enum Token {
     Until,             // 'until'
     Let,               // 'let'
     Return,            // 'return'
+    And,               // 'and'
+    Or,                // 'or'
+    Not,               // 'not'
 
-    Ignore, //Comment and Whitespace (should be filtered before lexing)
+    Ignore, //Comment and Whitespace (should be filtered before parsing)
 
     Integer,
     Float,
@@ -64,21 +64,27 @@ pub(crate) enum Token {
     Identifier,
 }
 
-// Represents an instance of a Token
-// Doesn't store data, only location, so copying is cheap
+/// Represents an instance of a Token.
+/// Stores the type of token, along with the source location where the token originated.
+///
+/// Implements Clone, so it can be cloned in the parser.
+/// The record doesn't store data, only location, so copying is cheap.
+///
 #[derive(Debug, Clone)]
 pub(crate) struct TokenRecord {
     pub(crate) token_type: Token,
     pub(crate) offset: usize,
-    length: usize,
+    pub(crate) length: usize,
 }
 
 impl TokenRecord {
 
-    // use .chars() or just this?
+    /// Returns the underlying content of the token.
+    /// use .chars() or just this?
     pub(crate) fn get_content<'a>(&self, input: &'a str) -> &'a str {
         &input[self.offset..self.offset + self.length]
     }
+
 
     pub fn range(&self) -> Range<usize> {
         self.offset..self.offset + self.length
@@ -113,6 +119,9 @@ fn identifier(input: Span) -> IResult<Token> {
         "return" => Token::Return,
         "true" => Token::Boolean,
         "false" => Token::Boolean,
+        "or" => Token::Or,
+        "and" => Token::And,
+        "not" => Token::Not,
         _ => Token::Identifier,
     };
 
@@ -153,19 +162,13 @@ fn string_literal(input: Span) -> IResult<Token> {
 }
 
 fn simple_token(input: Span) -> IResult<Token> {
-    alt((
         alt((
             map(tag("=="), |_| Token::EqualsEquals),
             map(tag("!="), |_| Token::NotEquals),
             map(tag("<="), |_| Token::LessThanEquals),
             map(tag(">="), |_| Token::GreaterThanEquals),
-            map(tag("||"), |_| Token::Or),
-            map(tag("&&"), |_| Token::And),
-            map(tag("!"),  |_| Token::Bang),
             map(tag("+"),  |_| Token::Plus),
             map(tag("-"),  |_| Token::Minus),
-        )),
-        alt((
             map(tag("*"),  |_| Token::Star),
             map(tag("/"),  |_| Token::RSlash),
             map(tag("\\"), |_|Token::LSlash),
@@ -180,8 +183,7 @@ fn simple_token(input: Span) -> IResult<Token> {
             map(tag("}"),  |_| Token::RBrace),
             map(tag(","),  |_| Token::Comma),
             map(tag("|"),  |_| Token::Bar),
-        ))
-    ))(input)
+        ))(input)
 }
 
 fn one_token(input: Span) -> IResult<TokenRecord> {
@@ -249,5 +251,4 @@ fn generate_report(location: Span, kind: BaseErrorKind<&str, Box<dyn Error+Send+
     let code = location.into_fragment().to_string();
     let code = format!("{:?}", code.to_string());
     eyre!("Error occurred while parsing '{kind}' {file}:{line}:{column}").with_section(move || code)
-
 }
