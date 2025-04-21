@@ -1,5 +1,12 @@
 # Changelog
 
+## x.x.x (xxxx-xx-xx)
+- Added ability to use `_` in variable and function names (Snake case can now be used in addition to Camel case)
+- Added the `time` library to the Standard Library
+- Documentation made clearer and more detailed
+- Added the `math` library to the Standard Library
+- Added the `os` library to the Standard Library
+
 ## 0.1.0 (2025-04-17)
 - Added the `string` library in the Mussel Standard Library to manipulate strings
 

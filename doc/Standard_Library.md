@@ -6,6 +6,9 @@ Mussel's Standard Library currently consists of the following libraries:
 
 - random
 - string
+- time
+- math
+- os
 
 ---
 
@@ -222,3 +225,188 @@ Trimmed name:   John
 - Passing non-string arguments to these functions will result in a runtime error.
 
 ---
+
+## time
+
+The `time` library provides utilities for handling time in Mussel programs. 
+
+```
+include time
+```
+
+### Functions
+
+#### `time_ms()`
+
+Returns the time in milliseconds since the Unix epoch (January 1, 1970).
+
+- **Arguments:**
+  - None
+- **Returns:** An integer representing the current time in milliseconds.
+- **Example:**
+
+```mussel
+include time
+
+let time = time_ms()
+println("Current time in milliseconds: {time}")
+```
+
+#### `time_sec()`
+
+Returns the time in seconds since the Unix epoch (January 1, 1970) as a floating-point number.
+
+- **Arguments:**
+  - None
+- **Returns:** An Float representing the current time in seconds.
+- **Example:**
+
+```mussel
+include time
+
+let start = time_sec()
+complex_operation()  # Replace with your operation
+let delta = time_sec() - start
+println("Operation took {delta} seconds")
+```
+
+
+#### Notes:
+
+- This library is still in development and more functions may be added in the future.
+- There will be more functionality for handling dates and times, such as formatting and parsing.
+
+---
+
+## math
+
+The `math` library provides basic arithmetic and mathematical functions for Mussel programs. To use this library, include it at the top of your script with:
+
+```
+include math
+```
+
+### Functions
+
+#### `abs(x)`
+
+Returns the absolute value of the numeric value `x`.
+
+- **Arguments:**
+  - `x`: a number (integer or float)
+- **Returns:** The absolute value of `x`
+- **Example:**
+
+```mussel
+include math
+
+let a = abs(-15)
+println("The absolute value is {a}")
+```
+
+#### `sqrt(x)`
+
+Returns the square root of the numeric value `x`.
+
+- **Arguments:**
+  - `x`: a number (integer or float)
+- **Returns:** A floating-point number representing the square root of `x`
+- **Example:**
+
+```mussel
+include math
+
+let root = sqrt(25)
+println("Square root of 25 is {root}")
+```
+
+#### `pow(base, exponent)`
+
+Raises a number `base` to the power of `exponent`.
+
+- **Arguments:**
+  - `base`: a numeric value (integer or float)
+  - `exponent`: a numeric value (integer or float)
+- **Returns:** A floating-point number representing the result of `base` raised to the power of `exponent`
+- **Example:**
+
+```mussel
+include math
+
+let power = pow(2, 3)
+println("2 to the power of 3 is {power}")
+```
+
+#### Notes:
+
+- Ensure the arguments provided to these functions are numeric values; otherwise, a runtime error may occur.
+- The `sqrt` function always returns a floating-point number.
+
+---
+
+## os
+
+The `os` library provides functionalities for performing operating system-level operations in Mussel programs. To use this library, include it at the top of your script with:
+
+```
+include os
+```
+
+### Functions
+
+#### `getcwd()`
+
+Returns the current working directory as a string.
+
+- **Arguments:**
+  - None
+- **Returns:** A string representing the current working directory.
+- **Example:**
+
+```mussel
+include os
+
+let cwd = getcwd()
+println("Current working directory: {cwd}")
+```
+
+#### `listdir(path)`
+
+Lists all entries in the specified directory.
+
+- **Arguments:**
+  - `path`: a string representing the directory path.
+- **Returns:** An array of strings, each representing an entry (file or directory) in the specified path.
+- **Example:**
+
+```mussel
+include os
+
+let entries = listdir("c:/Users/mark")
+println("Directory entries: {entries}")
+```
+
+#### `exists(path)`
+
+Checks if a specified path exists.
+
+- **Arguments:**
+  - `path`: a string representing the file or directory path.
+- **Returns:** A boolean (`true` or `false`) indicating whether the path exists.
+- **Example:**
+
+```mussel
+include os
+
+let flag = exists("c:/Users/mark")
+println("Does the path exist? {flag}")
+```
+
+#### Notes:
+
+- Ensure the provided path is a valid string.
+- If the supplied path for `listdir` does not exist or is inaccessible, an error will be thrown.
+
+---
+
+More libraries and functionality will be added to the standard library as Mussel evolves. Stay tuned!

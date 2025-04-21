@@ -1,16 +1,5 @@
 // Copyright (c) 2025 Francesco Giannice
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
 // Import definitions from the parser module that are needed for evaluation.
 use crate::parser::{Atom, BinOp, Expr, Operator, parse_interpolation};
@@ -322,6 +311,12 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                 crate::stdlib::random::load(context);
             } else if lib == "string" {
                 crate::stdlib::string::load(context);
+            } else if lib == "time" {
+                crate::stdlib::time::load(context);
+            } else if lib == "math" {
+                crate::stdlib::math::load(context);
+            } else if lib == "os" {
+                crate::stdlib::os::load(context);
             } else {
                 panic!("Unknown library: {lib}");
             }
