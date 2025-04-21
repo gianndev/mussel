@@ -85,29 +85,6 @@ This will output:
 The length of the string is 5
 ```
 
-#### `concat(s1, s2)`
-
-Concatenates two strings `s1` and `s2` and returns the result.
-
-- **Arguments:**
-- `s1`: the first string.
-- `s2`: the second string.
-- **Returns:** A new string that is the result of concatenating `s1` and `s2`.
-- **Example:**
-
-```mussel
-include string
-
-let fullName = concat("John", " Doe")
-println("Full name: {fullName}")
-```
-
-This will output:
-
-```
-Full name: John Doe
-```
-
 #### `split(s1, s2)`
 
 Splits string `s1` by using `s2` as a delimiter.
