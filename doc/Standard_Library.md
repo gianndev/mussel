@@ -6,6 +6,7 @@ Mussel's Standard Library currently consists of the following libraries:
 
 - random
 - string
+- time
 
 ---
 
@@ -109,6 +110,59 @@ Full name: John Doe
 
 - Strings in Mussel are immutable, so operations like `concat` return a new string without modifying the originals.
 - Passing non-string arguments to these functions will result in a runtime error.
+
+---
+
+
+## time
+
+The `time` library provides utilities for handling time in Mussel programs. 
+
+```
+include time
+```
+
+### Functions
+
+#### `time_ms()`
+
+Returns the time in milliseconds since the Unix epoch (January 1, 1970).
+
+- **Arguments:**
+  - None
+- **Returns:** An integer representing the current time in milliseconds.
+- **Example:**
+
+```mussel
+include time
+
+let time = time_ms()
+println("Current time in milliseconds: {time}")
+```
+
+#### `time_sec()`
+
+Returns the time in seconds since the Unix epoch (January 1, 1970) as a floating-point number.
+
+- **Arguments:**
+  - None
+- **Returns:** An Float representing the current time in seconds.
+- **Example:**
+
+```mussel
+include time
+
+let start = time_sec()
+complex_operation()  # Replace with your operation
+let delta = time_sec() - start
+println("Operation took {delta} seconds")
+```
+
+
+#### Notes:
+
+- This library is still in development and more functions may be added in the future.
+- There will be more functionality for handling dates and times, such as formatting and parsing.
 
 ---
 

@@ -1,0 +1,11 @@
+include time
+
+let start = time_ms()
+
+let counter = 1
+until counter > 500000 {
+    let counter = counter + 1
+}
+
+let end = time_ms()
+println("Measurement: {end - start} ms")
