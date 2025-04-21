@@ -14,4 +14,5 @@ In this folder you'll find some examples of Mussel files with Mussel code. Here 
 | `math.mus`      | Contains examples on defining variables using math expressions.            |
 | `random.mus`    | Contains the Mussel code that uses a module inside the standard library to have a random integer. |
 | `string.mus`    | An example demonstrating how to manipulate and work with strings in Mussel. |
+| `time.mus`      | A file that shows a usage example of the *time* library |
 | `until.mus`     | Contains examples on how to use the *until* loop (which is the equivalent of the while loop in many languages). |
