@@ -1,0 +1,10 @@
+include math
+
+let x = -42
+let abs_x = abs(x)
+let squared = pow(7, 2)
+let sqrt_val = sqrt(49)
+
+println("Absolute of x: {abs_x}")
+println("7 squared: {squared}")
+println("Square root of 49: {sqrt_val}")

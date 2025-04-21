@@ -24,6 +24,8 @@ let letters = ["a", "b", "c", "d", "e", "f"] // array
 
 ⚠️ *There is no need to manually specify the data type and no need to put a `;` at the end of each line: Mussel is smart enough to understand everything by itself*
 
+For variable names, the use of `_` has recently been supported. This allows both Camel case and Snake case notation to be used.
+
 ## println() function
 To print somethin on screen, like the content of a variable, you can use the `println()` function
 
@@ -116,15 +118,17 @@ Example of function definition:
 
 ```
 // Defined a function to add two numbers
-fn add(a, b) {
+fn add_numbers(a, b) {
     return a + b
 }
 
-let result = add(5, 7)
+let result = add_numbers(5, 7)
 println(result)
 ```
 
 *Note: In Mussel, functions are stored as closures in the interpreter's context, allowing for simple first-class function support.*
+
+For function names, the use of `_` has recently been supported. This allows both Camel case and Snake case notation to be used.
 
 ## Comments
 To add a comment in Mussel code, use `//` for inline comments.

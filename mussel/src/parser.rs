@@ -1,23 +1,12 @@
 // Copyright (c) 2025 Francesco Giannice
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
 // Import various combinators and types from the `nom` crate which is used for parsing.
 use nom::{
     Parser,
     branch::alt, // `alt` tries multiple parsers in order until one succeeds.
     bytes::complete::{is_not, take_until, take_while, tag}, // Parsers for matching parts of a string.
-    character::complete::{alpha1, digit1, line_ending}, // Parsers for alphabetic characters, digits, and whitespace.
+    character::complete::{alpha1, digit1, line_ending, alphanumeric1}, // Parsers for alphabetic characters, digits, and whitespace.
     combinator::{map, opt, recognize}, // `map` transforms parser output; `opt` makes a parser optional; `recognize` returns the matched slice.
     multi::{many0, separated_list0, fold_many0}, // `many0` for zero or more occurrences; `separated_list0` for a list with a separator.
     number::complete::double, // Parser to match a floating point number.
@@ -92,15 +81,22 @@ impl fmt::Display for Atom {
     }
 }
 
-// Parse a variable name which must consist of alphabetic characters.
-fn parse_variable(input: &str) -> IResult<String> {
-    let parser = alpha1.context("Expected name"); // Use `alpha1` and add error context.
-    map(parser, str::to_string)(input) // Convert the slice to a String.
+/// Parse an identifier: starts with [A-Za-z_] then zero or more [A-Za-z0-9_],
+fn parse_identifier(input: &str) -> IResult<String> {
+    // first char must be a letter or underscore
+    let first = alt((alpha1, tag("_")));
+    // subsequent chars can be alphanumeric or underscore
+    let rest = many0(alt((alphanumeric1, tag("_"))));
+    // combine and give a useful error if it fails
+    let parser = recognize(pair(first, rest))
+        .context("expected identifier starting with letter or underscore");
+    // slice to owned
+    map(parser, |s: &str| s.to_string())(input)
 }
 
 // Parse a name by wrapping the variable parser into an Atom::Name.
 fn parse_name(input: &str) -> IResult<Atom> {
-    map(parse_variable, Atom::Name)(input)
+    map(parse_identifier, Atom::Name)(input)
 }
 
 // Parse a string literal enclosed in double quotes.
@@ -237,7 +233,7 @@ fn parse_compare(input: &str) -> IResult<Expr> {
 // Parse a let-binding expression.
 fn parse_let(input: &str) -> IResult<Expr> {
     // Parse a pair: a variable, an "=" (with surrounding whitespace), and an expression.
-    let parse_statement = separated_pair(parse_variable, ws(tag("=")), parse_expr);
+    let parse_statement = separated_pair(parse_identifier, ws(tag("=")), parse_expr);
     // Precede the statement with the "let" keyword.
     let parser = preceded(ws(tag("let")), parse_statement)
         .context("Invalid let statement");
@@ -253,7 +249,7 @@ fn parse_call(input: &str) -> IResult<Expr> {
         tag(")"),
     );
     // Parse the function name followed by its arguments.
-    let parser = pair(parse_variable, parse_args).context("Invalid function call");
+    let parser = pair(parse_identifier, parse_args).context("Invalid function call");
     map(parser, |(name, args)| Expr::Call(name, args))(input)
 }
 
@@ -262,7 +258,7 @@ fn parse_function(input: &str) -> IResult<Expr> {
     // Parse the function parameters enclosed in parentheses.
     let parse_args = delimited(
         tag("("),
-        separated_list0(tag(","), ws(parse_variable)),
+        separated_list0(tag(","), ws(parse_identifier)),
         tag(")"),
     );
     // Parse the function body enclosed in curly braces.
@@ -270,7 +266,7 @@ fn parse_function(input: &str) -> IResult<Expr> {
     // Expect the "fn" keyword, then the function name, parameters, and body.
     let parser = preceded(
         tag("fn"),
-        tuple((ws(parse_variable), parse_args, ws(parse_body))),
+        tuple((ws(parse_identifier), parse_args, ws(parse_body))),
     );
     map(parser, |(name, args, body)| {
         Expr::Function(name, args, body)
@@ -282,7 +278,7 @@ fn parse_closure(input: &str) -> IResult<Expr> {
     // Parse closure parameters between pipes.
     let parse_args = delimited(
         tag("|"),
-        separated_list0(tag(","), ws(parse_variable)),
+        separated_list0(tag(","), ws(parse_identifier)),
         tag("|"),
     );
     // Pair the parsed parameters with a following expression (the closure's body).
@@ -317,7 +313,7 @@ fn parse_if(input: &str) -> IResult<Expr> {
 // Parse a for loop.
 fn parse_for(input: &str) -> IResult<Expr> {
     // Parse the loop variable following the "for" keyword.
-    let parse_name = preceded(tag("for"), ws(parse_variable));
+    let parse_name = preceded(tag("for"), ws(parse_identifier));
     // Parse the collection expression following the "in" keyword.
     let parse_collection = preceded(tag("in"), ws(parse_expr));
     // Parse the loop body enclosed in curly braces.
@@ -353,7 +349,7 @@ fn parse_get(input: &str) -> IResult<Expr> {
     // Expect the index to be enclosed in square brackets.
     let parse_index = delimited(tag("["), parse_number, tag("]"));
     // Pair the variable name with the index.
-    let parser = pair(parse_variable, parse_index);
+    let parser = pair(parse_identifier, parse_index);
     map(parser, |(name, index)| Expr::Get(name, index))(input)
 }
 
@@ -420,7 +416,7 @@ fn parse_include(input: &str) -> IResult<Expr> {
     // "include" keyword followed by whitespace and a library name
     let (input, _) = tag("include")(input)?;
     let (input, _) = ws(nom::combinator::success(()))(input)?;
-    let (input, lib_name) = parse_variable(input)?;
+    let (input, lib_name) = parse_identifier(input)?;
     Ok((input, Expr::Include(lib_name)))
 }
 
