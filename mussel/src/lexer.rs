@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Francesco Giannice
+// Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+
 extern crate nom;
 extern crate nom_locate;
 
@@ -11,12 +14,14 @@ use nom::bytes::complete::{take_while, take_while1};
 use nom::character::complete::{char, multispace1};
 use nom::character::complete::digit1;
 use nom::combinator::{map, map_res, opt, recognize};
+use nom::error::{ErrorKind, FromExternalError, ParseError};
+use nom::InputLength;
 use nom::multi::many0;
 use nom::sequence::{delimited, pair};
 use nom_locate::{position, LocatedSpan};
-use nom_supreme::error::{BaseErrorKind, ErrorTree};
-use nom_supreme::final_parser::final_parser;
-
+use nom_supreme::final_parser::{final_parser, ExtractContext};
+use crate::error;
+use crate::error::{FileIdentifier, FileSet};
 
 /// Represents a type of Token
 /// < byte, so trivial to copy
@@ -92,9 +97,38 @@ impl TokenRecord {
 }
 
 //remembers location and file
-pub type Span<'a> = LocatedSpan<&'a str, &'a str>;
-type IResult<'a, O> = nom::IResult<Span<'a>, O, ErrorTree<Span<'a>>>;
+pub type Span<'a> = LocatedSpan<&'a str>;
+type IResult<'a, O> = nom::IResult<Span<'a>, O, TokenError>;
 
+#[derive(Debug, PartialEq)]
+pub struct TokenError {
+    pub index: usize,
+}
+impl<I: InputLength> ParseError<I> for TokenError {
+    fn from_error_kind(input: I, _: ErrorKind) -> Self {
+        TokenError {
+            index: input.input_len()
+        }
+    }
+    fn append(_: I, _: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+impl FromExternalError<LocatedSpan<&str>, TokenError> for TokenError {
+    fn from_external_error(_: LocatedSpan<&str>, _: ErrorKind, other: TokenError) -> Self {
+        TokenError {
+            index: other.index,
+        }
+    }
+}
+
+impl ExtractContext<Span<'_>, TokenError> for TokenError {
+    fn extract_context(self, input: Span<'_>) -> TokenError {
+        TokenError {
+            index: input.len() - self.index,
+        }
+    }
+}
 
 /// Identifier start check
 /// Matches the following regex: [a-zA-Z_]
@@ -159,9 +193,9 @@ fn number(input: Span) -> IResult<Token> {
         recognize(pair(digit1, opt(pair(char('.'), digit1)))),
         |num_str: Span| {
             if num_str.contains('.') {
-                Ok::<Token, ErrorTree<&'_ str>>(Token::Float)
+                Ok::<Token, TokenError>(Token::Float)
             } else {
-                Ok::<Token, ErrorTree<&'_ str>>(Token::Integer)
+                Ok::<Token, TokenError>(Token::Integer)
             }
         },
     )(input)
@@ -236,42 +270,11 @@ fn tokens(input: Span) -> IResult<Vec<TokenRecord>> {
 }
 
 /// Main entry point for the lexer.
-pub fn lex(input: Span) -> Result<Vec<TokenRecord>, Report> {
-    final_parser(tokens)(input).map_err(|e| format_error(e))
+pub fn lex(files: &FileSet, file: FileIdentifier) -> Result<Vec<TokenRecord>, error::TokenError> {
+    let input = files.get_content(file).expect("File not found");
+    let input = LocatedSpan::new(input);
+    final_parser(tokens)(input).map_err(|a: TokenError| {
+        error::TokenError::new(file, a.index)
+    })
 }
 
-
-// <editor-fold desc="Error handling">
-
-/// Converts a nom error into an eyre Report.
-fn format_error(error: ErrorTree<Span>) -> Report {
-    let base = match error {
-        ErrorTree::Base { location, kind } => {
-            generate_report(location, kind)
-        }
-        ErrorTree::Stack { base, contexts: _contexts } => {
-            format_error(*base)
-        }
-
-        ErrorTree::Alt(other) => {
-            for x in other {
-                return format_error(x);
-            }
-            eyre!("Error occurred while parsing")
-        }
-    };
-    base
-}
-
-fn generate_report(location: Span, kind: BaseErrorKind<&str, Box<dyn Error+Send+Sync>>) -> Report {
-    let file = location.extra;
-    let kind = kind.to_string();
-    let line = location.location_line();
-    let column = location.get_column();
-
-    let code = location.into_fragment().to_string();
-    let code = format!("{:?}", code.to_string());
-    eyre!("Error occurred while parsing '{kind}' {file}:{line}:{column}").with_section(move || code)
-}
-
-// </editor-fold>

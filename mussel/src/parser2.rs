@@ -1,12 +1,15 @@
-use color_eyre::eyre::eyre;
-use color_eyre::{Help, Report};
+// Copyright (c) 2025 Francesco Giannice
+// Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+
+use color_eyre::{Help};
 use nom::multi::{many0, separated_list0};
 use nom::{Parser};
 use nom::branch::alt;
 use nom::combinator::{cut, map, opt};
-use nom::error::ParseError;
 use nom::sequence::{delimited, tuple};
-use nom_locate::LocatedSpan;
+use nom_supreme::final_parser::{final_parser, ExtractContext};
+use crate::error;
+use crate::error::{FileIdentifier, LError};
 use crate::lexer::{Token, TokenRecord};
 
 
@@ -72,7 +75,7 @@ use crate::lexer::{Token, TokenRecord};
 
 
 /// Defines a custom Result type with the input of TokenRecords and the custom ErrorType
-type IResult<'a, O> = nom::IResult<&'a [TokenRecord], O, ErrorKind>;
+type IResult<'a, O> = nom::IResult<&'a [TokenRecord], O, ParseError>;
 
 /// Used to define where an Expression was defined. Currently not used.
 type Range = core::ops::Range<usize>;
@@ -83,7 +86,7 @@ type Range = core::ops::Range<usize>;
 /// `self.to_string` returns a readable error message.
 ///
 /// implements `ParseError` to use as a nom error
-pub(crate) enum ErrorKind {
+pub(crate) enum ParseError {
 
     // Unexpected Token
     UnexpectedToken { found: TokenRecord, expected: Token },
@@ -91,112 +94,98 @@ pub(crate) enum ErrorKind {
     // Fallback when the parser reaches the end of the input
     Eof,
 
-    // When not all tokens where consumed
-    UnexpectedEndOfInput { record: TokenRecord },
+    // Unexpected Token
+    UnexpectedEnd { found: TokenRecord },
 
     // nom::error::ErrorKind is the standard nom error, needed for ParseError
     Internal { record: TokenRecord, kind: nom::error::ErrorKind },
 
     // Combining multiple errors
     // fixme: This might not be useful for the user in the future
-    List(Vec<ErrorKind>)
+    List(Vec<ParseError>)
 }
 
-impl<'a> ParseError<&'a [TokenRecord]> for ErrorKind {
+impl<'a> nom::error::ParseError<&'a [TokenRecord]> for ParseError {
     fn from_error_kind(input: &'a [TokenRecord], kind: nom::error::ErrorKind) -> Self {
+
+
         if let Some((first, _)) = input.split_first() {
-            ErrorKind::Internal {
-                record: first.clone(),
-                kind
+            if kind == nom::error::ErrorKind::Eof {
+                ParseError::UnexpectedEnd {
+                    found: first.clone()
+                }
+            } else {
+                ParseError::Internal {
+                    record: first.clone(),
+                    kind
+                }
             }
         } else {
-            ErrorKind::Eof
+            ParseError::Eof
         }
     }
 
     fn append(input: &'a [TokenRecord], kind: nom::error::ErrorKind, other: Self) -> Self {
         let fst = if let Some((first, _)) = input.split_first() {
-            ErrorKind::Internal {
+            ParseError::Internal {
                 record: first.clone(),
                 kind
             }
         } else {
-            ErrorKind::Eof
+            ParseError::Eof
         };
-        ErrorKind::List(vec![fst, other])
+        ParseError::List(vec![fst, other])
     }
 
     fn from_char(input: &'a [TokenRecord], _c: char) -> Self {
         if let Some((first, _)) = input.split_first() {
-            ErrorKind::UnexpectedToken {
+            ParseError::UnexpectedToken {
                 found: first.clone(),
                 expected: Token::Identifier,
             }
         } else {
-            ErrorKind::Eof
+            ParseError::Eof
         }
     }
 
     fn or(self, other: Self) -> Self {
-        ErrorKind::List(vec![self, other])
+        ParseError::List(vec![self, other])
+    }
+}
+impl ExtractContext<&[TokenRecord], ParseError> for ParseError {
+    fn extract_context(self, _: &[TokenRecord]) -> ParseError {
+        self
     }
 }
 
-impl ErrorKind {
+pub fn offset_to_line_column(text: &str, offset: usize) -> Option<(usize, usize)> {
+    if offset > text.len() {
+        return None;
+    }
 
-    /// Returns the offset of the error in the input stream (character index)
-    fn get_offset(&self, max: usize) -> usize {
-        match self {
-            ErrorKind::UnexpectedToken { found, expected: _ } => found.offset,
-            ErrorKind::Eof => max,
-            ErrorKind::UnexpectedEndOfInput { record } => record.offset,
-            ErrorKind::Internal { record, kind: _ } => record.offset,
-            ErrorKind::List(v) => v.first().unwrap().get_offset(max)
+    let mut current_offset = 0;
+    for (line_number, line) in text.lines().enumerate() {
+        let line_len = line.len();
+
+        if offset <= current_offset + line_len {
+            let column = offset - current_offset + 1;
+            return Some((line_number + 1, column));
+        }
+
+        // Add 1 for the '\n' character that .lines() strips
+        current_offset += line_len + 1;
+    }
+
+    // If offset is at the very end (after the last line)
+    if offset == text.len() {
+        if let Some(last_line_number) = text.lines().count().checked_sub(1) {
+            return Some((last_line_number + 1, text.lines().last().unwrap_or("").len() + 1));
         }
     }
 
-    /// Returns a human-readable error message
-    fn to_string(self) -> String {
-        match self {
-            ErrorKind::UnexpectedToken { found, expected } => {
-                format!("Unexpected token: {:?}, expected {:?}", found.token_type, expected)
-            },
-            ErrorKind::Eof => "End of file reached".to_string(),
-            ErrorKind::UnexpectedEndOfInput { record } => {
-                format!("Unexpected end of input at token: {:?}", record.token_type)
-            }
-            ErrorKind::Internal { record: _, kind } => {
-                format!("{:?}", kind)
-            }
-            ErrorKind::List(list) => {
-                let mut result = String::new();
-                for error in list {
-                    result.push_str(&error.to_string());
-                    result.push('\n');
-                }
-                result
-            }
-        }
-    }
-
-    /// Creates an eyre Error report with the error message and the code snippet, along with the
-    /// source location
-    pub(crate) fn create_report(self, file: &str, file_content: &str) -> Report {
-
-        let location = self.get_offset(file_content.len());
-        let span = unsafe { LocatedSpan::new_from_raw_offset(location, 0, file_content, ()) };
-
-        let kind = self.to_string();
-        let line = span.location_line();
-        let column = span.get_column();
-
-        let code = file_content;
-        let code = format!("{:?}", code.to_string());
-        eyre!("Error occurred while parsing '{kind}' {file}:{line}:{column}").with_section(move || code)
-
-    }
-
+    None
 }
+
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum BinaryOperator {
@@ -265,31 +254,48 @@ fn match_token<'a>(expected: Token) -> impl Fn(&'a [TokenRecord]) -> IResult<&'a
             if first.token_type == expected {
                 Ok((rest, first))
             } else {
-                Err(nom::Err::Error(ErrorKind::UnexpectedToken {
+                Err(nom::Err::Error(ParseError::UnexpectedToken {
                     found: first.clone(),
                     expected,
                 }))
             }
         } else {
-            Err(nom::Err::Error(ErrorKind::Eof))
+            Err(nom::Err::Error(ParseError::Eof))
         }
     }
 }
 
 
 /// Main entry function for the parser
-pub fn parser(input: &[TokenRecord]) -> Result<Vec<Expression>, ErrorKind> {
-    match unit(input) {
-        Ok((left, expr)) =>
-            if !left.is_empty() {
-                Err(ErrorKind::UnexpectedEndOfInput {record: left[0].clone() })
-            } else {
-                Ok(expr)
+pub fn parser(file: FileIdentifier, input: &[TokenRecord]) -> Result<Vec<Expression>, Box<dyn LError>> {
+    let max_length = input.last().map(|last| last.offset + last.length).unwrap_or(0);
+    final_parser(unit)(input).map_err(|a| to_external_error(a, file, max_length))
+}
+
+fn to_external_error(internal: ParseError, file: FileIdentifier, max_length: usize) -> Box<dyn LError> {
+    match internal {
+        ParseError::UnexpectedToken { found, expected } => {
+            let message = format!("Unexpected token: {:?}, expected {:?}", found.token_type, expected);
+            Box::new(error::UnexpectedTokenError::new(file, found, message))
+        },
+        ParseError::Eof => {
+            Box::new(error::UnexpectedEndOfFileError::new(file, max_length))
+        }
+        ParseError::Internal { record, kind } => {
+            let message = format!("Error Parsing: {:?}", kind);
+            Box::new(error::UnexpectedTokenError::new(file, record, message))
+        }
+        ParseError::List(list) => {
+            let mut compound = error::ErrorCollection::new();
+            for internal_ in list {
+                compound.add_error(to_external_error(internal_, file, max_length));
             }
-        Err(err) => match err {
-            nom::Err::Incomplete(_) => Err(ErrorKind::Eof),
-            nom::Err::Error(e) => Err(e),
-            nom::Err::Failure(e) => Err(e)
+
+            Box::new(compound)
+        }
+        ParseError::UnexpectedEnd { found } => {
+            let message = "Invalid syntax".to_string();
+            Box::new(error::UnexpectedTokenError::new(file, found, message))
         }
     }
 }
@@ -425,7 +431,7 @@ fn equality_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = relational_expression(input)?;
     let (input, right) = opt(tuple((
         alt((
-            map(match_token(Token::Equals), |_| BinaryOperator::Equal),
+            map(match_token(Token::EqualsEquals), |_| BinaryOperator::Equal),
             map(match_token(Token::NotEquals), |_| BinaryOperator::NotEqual),
         )),
         equality_expression
