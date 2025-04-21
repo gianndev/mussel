@@ -24,8 +24,8 @@ include random
 Generates a random number between `min` and `max`, inclusive.
 
 - **Arguments:**
-  - `min`: a numeric value (integer or float), representing the lower bound of the random number range.
-  - `max`: a numeric value (integer or float), representing the upper bound of the random number range.
+- `min`: a numeric value (integer or float), representing the lower bound of the random number range.
+- `max`: a numeric value (integer or float), representing the upper bound of the random number range.
 - **Returns:** A random integer between `min` and `max` (rounded if float inputs are used).
 - **Example:**
 
@@ -65,7 +65,7 @@ include string
 Returns the length of the string `s`.
 
 - **Arguments:**
-  - `s`: a string whose length is to be calculated.
+- `s`: a string whose length is to be calculated.
 - **Returns:** An integer representing the number of characters in the string.
 - **Example:**
 
@@ -87,8 +87,8 @@ The length of the string is 5
 Concatenates two strings `s1` and `s2` and returns the result.
 
 - **Arguments:**
-  - `s1`: the first string.
-  - `s2`: the second string.
+- `s1`: the first string.
+- `s2`: the second string.
 - **Returns:** A new string that is the result of concatenating `s1` and `s2`.
 - **Example:**
 
@@ -105,11 +105,120 @@ This will output:
 Full name: John Doe
 ```
 
+#### `split(s1, s2)`
+
+Splits string `s1` by using `s2` as a delimiter.
+
+- **Arguments:**
+  - `s1`: the first string which is to be splitted.
+  - `s2`: the second string which is the delimeter.
+- **Returns:** An array of strings
+- **Example:**
+
+```mussel
+include string
+
+let parts = split("John,Doe,Jane,Doe", ",")
+println("Parts: {parts}")
+```
+
+This will output:
+
+```
+Parts: [John, Doe, Jane, Doe]
+```
+
+#### `reverse(s)`
+
+Reverses string `s`.
+
+- **Arguments:**
+  - `s`: a string which will be reversed
+- **Returns:** a new string which is the reverse of `s`
+- **Example:**
+
+```mussel
+include string
+
+let name = "john"
+println("Reversed name: {reverse(name)}")
+```
+
+This will output:
+
+```
+Reversed name: nhoj
+```
+
+#### `trim(s)`
+
+Trims string `s`.
+
+- **Arguments:**
+  - `s`: a string which will get trimmed
+- **Returns:** a new string without leading and trailing whitespace
+- **Example:**
+
+```mussel
+include string
+
+let name = "  John   "
+println("Trimmed name: {trim(name)}")
+```
+
+This will output:
+
+```
+Trimmed name: John 
+```
+
+#### `ltrim(s)`
+
+Left trims string `s`.
+
+- **Arguments:**
+  - `s`: a string which will get trimmed
+- **Returns:** a new string without leading whitespace
+- **Example:**
+
+```mussel
+include string
+
+let name = "  John   "
+println("Trimmed name: {ltrim(name)}")
+```
+
+This will output:
+
+```
+"Trimmed name: John   "
+```
+
+#### `rtrim(s)`
+
+Right trims string `s`.
+
+- **Arguments:**
+  - `s`: a string which will get trimmed
+- **Returns:** a new string without trailing whitespace
+- **Example:**
+
+```mussel
+include string
+
+let name = "  John   "
+println("Trimmed name: {rtrim(name)}")
+```
+
+This will output:
+
+```
+Trimmed name:   John
+```
+
 #### Notes:
 
 - Strings in Mussel are immutable, so operations like `concat` return a new string without modifying the originals.
 - Passing non-string arguments to these functions will result in a runtime error.
 
 ---
-
-More libraries and functionality will be added to the standard library as Mussel evolves. Stay tuned!
