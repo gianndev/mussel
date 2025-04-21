@@ -1,8 +1,13 @@
 include string
 
-println("Hello, " + "World") //Output: Hello, World!
+println("Hello, " + "World")           //Output: Hello, World!
 
 let s = "Hello, World!"
-println(lowercase(s))        // Output: hello, world!
-println(uppercase(s))        // Output: HELLO, WORLD!
-println(length(s))           // Output: 13
+println(lowercase(s))                  // Output: hello, world!
+println(uppercase(s))                  // Output: HELLO, WORLD!
+println(length(s))                     // Output: 13
+println(split(s, ", "))                // Output: [Hello, World!]
+println(reverse(s))                    // Output: !dlroW ,olleH 
+println(trim("   " + s + "   "))       // Output: Hello, World!
+println(ltrim("  " + s + "   "))       // Output: "Hello, World!    "      
+println(rtrim("  " + s + "   "))       // Output: "   Hello World!"
