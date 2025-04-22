@@ -1,0 +1,13 @@
+// This file prints to the screen how many milliseconds Mussel takes to count from 1 to a million.
+
+include time
+
+let start = time_ms()
+
+let counter = 1
+until counter > 1000000 {
+    let counter = counter + 1
+}
+
+let end = time_ms()
+println("Measurement: {end - start} ms")

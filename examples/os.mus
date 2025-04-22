@@ -1,0 +1,15 @@
+include os
+
+// Get the current working directory
+let cwd = getcwd()
+println("Current working directory: {cwd}")
+
+// Check if a specific path exists
+let path = "c:/Users/user/Desktop"
+let existsFlag = exists(path)
+println("Does the path '{path}' exist? {existsFlag}")
+
+// List directory entries in the current working directory
+let entries = listdir(cwd)
+println("Directory entries in {cwd}:")
+println(entries)
