@@ -4,13 +4,16 @@
 use std::fmt::Display;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::SimpleFiles;
-use codespan_reporting::term;
-use codespan_reporting::term::termcolor::{StandardStream};
+use codespan_reporting::{
+    diagnostic::{Diagnostic, Label},
+    files::SimpleFiles,
+    term,
+};
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use crate::lexer::{TokenRecord};
 
-
+/// Represents a set of files and their content.
+/// Only one of these should exist at a time.
 pub struct FileSet {
     files: SimpleFiles<FilePath, String>
 }
@@ -23,7 +26,7 @@ impl FileSet {
     }
 
     pub fn add_file<P: AsRef<Path>>(&mut self, path: P, content: String) -> FileIdentifier {
-        let id = self.files.add(FilePath { path: path.as_ref().to_path_buf() }, content);
+        let id = self.files.add(FilePath::new(path), content);
         FileIdentifier(id)
     }
 
@@ -37,12 +40,29 @@ impl FileSet {
 
 }
 
+/// File identifier used to lookup files in the `FileSet`.
+/// Every file identifier points to a valid file.
 #[derive(Clone, Copy, Debug)]
 pub struct FileIdentifier(usize);
 
+/// Wrapper for a file path.
 #[derive(Clone)]
 pub struct FilePath {
     path: PathBuf,
+}
+
+impl FilePath {
+    fn new<P: AsRef<Path>>(path: P) -> FilePath {
+        FilePath {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+}
+
+impl AsRef<Path> for FilePath {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
 }
 
 impl Display for FilePath {
@@ -51,19 +71,31 @@ impl Display for FilePath {
     }
 }
 
-pub struct Reporter<'a> {
-    files: &'a FileSet,
+/// Error reporter to print errors to stderr.
+///
+/// Usage:
+/// ```
+/// let files = FileSet::new();
+/// let file_id = files.add_file("example.mus", "let x = 42;".to_string());
+///
+/// let reporter = Reporter::new(files);
+/// reporter.report(error); //reports to stderr
+/// ```
+pub struct Reporter {
+    files: FileSet,
     config: term::Config,
+
+    /// Writer to output the errors to (stderr).
     writer: StandardStream,
 }
 
-impl Reporter<'_> {
-    pub fn new(files: &FileSet) -> Reporter {
+impl Reporter {
+    pub fn new(files: FileSet) -> Reporter {
         let config = term::Config::default();
         Reporter {
             files,
             config,
-            writer: StandardStream::stderr(term::termcolor::ColorChoice::Always),
+            writer: StandardStream::stderr(ColorChoice::Always),
         }
     }
 
@@ -81,12 +113,13 @@ impl Reporter<'_> {
     }
 }
 
+/// Base trait for all errors.
 pub trait LError {
-
     fn report(&self) -> Vec<Diagnostic<usize>>;
-
 }
 
+
+/// Creates a code label for a specific source location.
 fn label(file: FileIdentifier, range: Range<usize>) -> Label<usize> {
     Label::primary(file.0, range)
 }
@@ -100,6 +133,7 @@ impl LError for Box<dyn LError> {
     }
 }
 
+/// Used to aggregate multiple errors into a single error.
 pub struct ErrorCollection {
     errors: Vec<Box<dyn LError>>,
 }
@@ -125,6 +159,31 @@ impl LError for ErrorCollection {
         diagnostics
     }
 }
+
+
+pub struct FileError {
+    path: FilePath,
+    message: String,
+}
+
+impl FileError {
+    pub fn new<P: AsRef<Path>>(path: P, message: String) -> Self {
+        FileError {
+            path: FilePath::new(path),
+            message
+        }
+    }
+}
+
+impl LError for FileError {
+    fn report(&self) -> Vec<Diagnostic<usize>> {
+        let diagnostic = Diagnostic::error()
+            .with_message(self.message.clone())
+            .with_notes(vec![format!("File: {}", self.path)]);
+        vec![diagnostic]
+    }
+}
+
 
 pub struct TokenError {
     file: FileIdentifier,
@@ -199,5 +258,3 @@ impl LError for UnexpectedEndOfFileError {
         vec![diagnostic]
     }
 }
-
-
