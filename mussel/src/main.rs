@@ -1,6 +1,8 @@
 // Copyright (c) 2025 Francesco Giannice
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
+use std::path;
+use std::path::Path;
 // Import the `FromArgs` trait from the `argh` crate for parsing command line arguments.
 use argh::FromArgs;
 
@@ -13,12 +15,16 @@ use color_eyre::{
     eyre::{eyre, WrapErr},
     Help, Result,
 };
+use crate::error::{FileError, FileIdentifier, FileSet, Reporter};
 
 // Declare the modules that are defined in separate files.
 // Rust will look for "interpreter.rs" and "parser.rs" in the same directory.
 mod interpreter;
 mod parser;
 mod stdlib;
+mod error;
+mod lexer;
+mod parser2;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
 // The doc-comment (triple slash) describes the application when running the help command.
@@ -44,7 +50,7 @@ fn main() -> Result<()> {
 
     // Load the file specified in the command-line arguments into the `FileSet`.
     // If loading fails, print the error using the `Reporter` and return early.
-    let input = match load_file(&mut files, &file) {
+    let file = match load_file(&mut files, &file) {
         Ok(file_id) => file_id,
         Err(error) => {
             let reporter = Reporter::new(files);
@@ -52,8 +58,29 @@ fn main() -> Result<()> {
             return Ok(());
         }
     };
+
+    let tokens = match lexer::lex(&files, file) {
+        Ok(tokens) => tokens,
+        Err(error) => {
+            let reporter = Reporter::new(files);
+            reporter.report(error);
+            return Ok(())
+        }
+    };
+    tokens.iter().for_each(|r| println!("{:?}", r));
+
+    let expressions= match parser2::parser(file, &tokens) {
+        Ok(tokens) => tokens,
+        Err(error) => {
+            let reporter = Reporter::new(files);
+            reporter.report(error);
+            return Ok(())
+        }
+    };
+    expressions.iter().for_each(|r| println!("{:?}", r));
+
     // When the file is loaded successfully, retrieve its content.
-    let file_content = files.get_content(input).unwrap_or_else(|| {
+    let file_content = files.get_content(file).unwrap_or_else(|| {
         // This should never happen. Every FileIdentifier should be valid.
         panic!("Failed to retrieve content");
     });
