@@ -1,6 +1,6 @@
 # Changelog
 
-## x.x.x (xxxx-xx-xx)
+## 0.2.0 (2025-04-22)
 - Added ability to use `_` in variable and function names (Snake case can now be used in addition to Camel case)
 - Added the `time` library to the Standard Library
 - Documentation made clearer and more detailed

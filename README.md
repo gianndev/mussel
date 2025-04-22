@@ -50,7 +50,7 @@ You can find some examples of Mussel code in the [examples](/examples/) folder.
 
 ## Version
 
-The current latest version of Mussel is **0.1.0**
+The current latest version of Mussel is **0.2.0**
 
 ## License
 

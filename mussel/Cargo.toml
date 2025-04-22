@@ -1,7 +1,7 @@
 [package]
 name = "mussel"
 description = "Mussel: an interpreted programming language written in Rust"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Francesco Giannice <giannice.developer@gmail.com>"]
 edition = "2024"
 readme = "README.md"
