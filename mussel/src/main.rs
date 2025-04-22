@@ -25,6 +25,7 @@ mod stdlib;
 mod error;
 mod lexer;
 mod parser2;
+mod expr;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
 // The doc-comment (triple slash) describes the application when running the help command.
