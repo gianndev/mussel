@@ -118,6 +118,9 @@ pub trait LError {
     fn report(&self) -> Vec<Diagnostic<usize>>;
 }
 
+pub fn boxed<E: LError + 'static>(err: E) -> Box<dyn LError> {
+    Box::new(err)
+}
 
 /// Creates a code label for a specific source location.
 fn label(file: FileIdentifier, range: Range<usize>) -> Label<usize> {

@@ -1,5 +1,5 @@
 use std::fmt;
-use crate::error::{FileIdentifier, NotSupportedOperationError};
+use crate::error::{FileIdentifier, FileSet, NotSupportedOperationError};
 use crate::parser2::Expression;
 
 // Define the `Atom` enum representing the basic literal values in the language.
@@ -70,14 +70,24 @@ pub enum Expr {
 
 impl Expr {
 
-    pub fn from_parser(file: FileIdentifier, content: &str, expr: Expression) -> Result<Expr,
-        NotSupportedOperationError> {
+    pub fn from_parser(files:& FileSet, file: FileIdentifier, parsed: Vec<Expression>)
+                       -> Result<Vec<Expr>, NotSupportedOperationError> {
+
+        let content = files.get_content(file).unwrap_or_else(|| {
+            panic!("Failed to retrieve content");
+        });
+
+        Self::from_parser_block(file, content, parsed)
+
+    }
+
+    fn from_parser_inner(file: FileIdentifier, content: &str, expr: Expression) -> Result<Expr, NotSupportedOperationError> {
         Ok(match expr {
             Expression::Include { id } => {
                 Expr::Include(id.get_content(content).to_string())
             }
             Expression::Return { expr } =>  {
-                Expr::Return(Box::new(Self::from_parser(file, content, *expr)?))
+                Expr::Return(Box::new(Self::from_parser_inner(file, content, *expr)?))
             }
             Expression::Function { id, args, block } => {
                 let name = id.get_content(content).to_string();
@@ -90,16 +100,16 @@ impl Expr {
             Expression::For { id, expr, block } => {
                 let name = id.get_content(content).to_string();
                 let body = Self::from_parser_block(file, content, block)?;
-                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                let expr = Box::new(Self::from_parser_inner(file, content, *expr)?);
                 Expr::For(name, expr, body)
             }
             Expression::Until { expr, block } => {
-                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                let expr = Box::new(Self::from_parser_inner(file, content, *expr)?);
                 let body = Self::from_parser_block(file, content, block)?;
                 Expr::Until(expr, body)
             }
             Expression::If { expr, block, else_block } => {
-                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                let expr = Box::new(Self::from_parser_inner(file, content, *expr)?);
                 let body = Self::from_parser_block(file, content, block)?;
                 let else_body = if let Some(else_block) = else_block {
                     Some(Self::from_parser_block(file, content, else_block)?)
@@ -110,12 +120,12 @@ impl Expr {
             }
             Expression::Let { id, expr } => {
                 let name = id.get_content(content).to_string();
-                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                let expr = Box::new(Self::from_parser_inner(file, content, *expr)?);
                 Expr::Let(name, expr)
             }
             Expression::Binary { left, operator: (operator, token), right } => {
-                let lhs = Box::new(Self::from_parser(file, content, *left)?);
-                let rhs = Box::new(Self::from_parser(file, content, *right)?);
+                let lhs = Box::new(Self::from_parser_inner(file, content, *left)?);
+                let rhs = Box::new(Self::from_parser_inner(file, content, *right)?);
                 return if let Some(binOp) = operator.into() {
                     Ok(Expr::Binary(lhs, binOp, rhs))
                 } else if let Some(op) = operator.into() {
@@ -198,7 +208,7 @@ impl Expr {
                 Expr::Closure(args, body)
             }
             Expression::Call { region, left, args } => {
-                let name = Self::from_parser(file, content, *left)?;
+                let name = Self::from_parser_inner(file, content, *left)?;
                 let args = Self::from_parser_block(file, content, args)?;
                 return if let Expr::Constant(Atom::Name(name)) = name {
                     Ok(Expr::Call(name.to_string(), args))
@@ -211,8 +221,8 @@ impl Expr {
                 }
             }
             Expression::Index { region, left, index } => {
-                let name = Self::from_parser(file, content, *left)?;
-                let index = Self::from_parser(file, content, *index)?;
+                let name = Self::from_parser_inner(file, content, *left)?;
+                let index = Self::from_parser_inner(file, content, *index)?;
                 return if let Expr::Constant(Atom::Name(name)) = name {
                     if let Expr::Constant(Atom::Number(index)) = index {
                         Ok(Expr::Get(name.to_string(), index as usize))
@@ -235,7 +245,7 @@ impl Expr {
     }
     fn from_parser_block(file: FileIdentifier, content: &str, block: Vec<Expression>) -> Result<Vec<Expr>, NotSupportedOperationError> {
         block.into_iter().map(|expr| {
-            Self::from_parser(file, content, expr)
+            Self::from_parser_inner(file, content, expr)
         }).collect()
     }
 
