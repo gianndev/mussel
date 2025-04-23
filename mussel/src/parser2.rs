@@ -10,6 +10,7 @@ use nom::sequence::{delimited, tuple};
 use nom_supreme::final_parser::{final_parser, ExtractContext};
 use crate::error;
 use crate::error::{FileIdentifier, LError};
+use crate::expr::{BinOp, Operator};
 use crate::lexer::{Token, TokenRecord};
 
 
@@ -203,6 +204,32 @@ pub(crate) enum BinaryOperator {
     GreaterThanOrEqual,
 }
 
+impl Into<Option<BinOp>> for BinaryOperator {
+    fn into(self) -> Option<BinOp> {
+        match self {
+            BinaryOperator::Add => Some(BinOp::Add),
+            BinaryOperator::Subtract => Some(BinOp::Sub),
+            BinaryOperator::Multiply => Some(BinOp::Mul),
+            BinaryOperator::Divide => Some(BinOp::Div),
+            _ => None,
+        }
+    }
+}
+
+impl Into<Option<Operator>> for BinaryOperator {
+    fn into(self) -> Option<Operator> {
+        match self {
+            BinaryOperator::Equal => Some(Operator::Equal),
+            BinaryOperator::NotEqual => Some(Operator::NotEqual),
+            BinaryOperator::LessThan => Some(Operator::LessThan),
+            BinaryOperator::GreaterThan => Some(Operator::GreaterThan),
+            BinaryOperator::LessThanOrEqual => Some(Operator::LessThanEqual),
+            BinaryOperator::GreaterThanOrEqual => Some(Operator::GreaterThanEqual),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum UnaryOperator {
     Negate,
@@ -219,10 +246,10 @@ pub(crate) enum Expression {
     If { expr: Box<Expression>, block: Vec<Expression>, else_block: Option<Vec<Expression>> },
     Let { id: TokenRecord, expr: Box<Expression> },
 
-    Binary { left: Box<Expression>, operator: BinaryOperator, right: Box<Expression> },
-    Unary { operator: UnaryOperator, expr: Box<Expression> },
+    Binary { left: Box<Expression>, operator: (BinaryOperator, TokenRecord), right: Box<Expression> },
+    Unary { operator: (UnaryOperator, TokenRecord), expr: Box<Expression> },
 
-    Assignment { left: Box<Expression>, right: Box<Expression> },
+    Assignment { region: TokenRecord, left: Box<Expression>, right: Box<Expression> },
 
     Identifier(TokenRecord),
     String(TokenRecord),
@@ -232,8 +259,8 @@ pub(crate) enum Expression {
     Array(Vec<Expression>),
     Closure { args: Vec<TokenRecord>, block: Vec<Expression> },
 
-    Call { left: Box<Expression>, args: Vec<Expression> },
-    Index { left: Box<Expression>, index: Box<Expression> },
+    Call { region: TokenRecord, left: Box<Expression>, args: Vec<Expression> },
+    Index { region: TokenRecord, left: Box<Expression>, index: Box<Expression> },
 }
 
 
@@ -241,8 +268,8 @@ pub(crate) enum Expression {
 /// The Call and Index expression store the left side of the expression, so this extra step is
 /// needed to satisfy the borrow checker.
 enum PostFixExpr {
-    Call(Vec<Expression>),
-    Index(Box<Expression>),
+    Call(TokenRecord, Vec<Expression>),
+    Index(TokenRecord, Box<Expression>),
 }
 
 
@@ -308,11 +335,11 @@ fn expression_list(input: &[TokenRecord]) -> IResult<Vec<Expression>> {
 }
 
 fn post_fix(input: &[TokenRecord]) -> IResult<PostFixExpr> {
-    let call = delimited(match_token(Token::LParenthesis), expression_list, match_token(Token::RParenthesis));
-    let index = delimited(match_token(Token::LBracket), expr, match_token(Token::RBracket));
+    let call = tuple((match_token(Token::LParenthesis), expression_list, match_token(Token::RParenthesis)));
+    let index = tuple((match_token(Token::LBracket), expr, match_token(Token::RBracket)));
     alt((
-        map(call, |args| PostFixExpr::Call(args)),
-        map(index, |index| PostFixExpr::Index(Box::new(index))),
+        map(call, |(l, args, r)| PostFixExpr::Call(l.clone(), args)),
+        map(index, |(l, index, r)| PostFixExpr::Index(l.clone(), Box::new(index))),
     ))(input)
 }
 
@@ -323,8 +350,10 @@ fn factor(input: &[TokenRecord]) -> IResult<Expression> {
 
     fn apply(expr: PostFixExpr, left: Expression) -> Expression {
         match expr {
-            PostFixExpr::Call(args) => Expression::Call { left: Box::new(left), args },
-            PostFixExpr::Index(index) => Expression::Index { left: Box::new(left), index },
+            PostFixExpr::Call(record, args) =>
+                Expression::Call { region: record, left: Box::new(left), args },
+            PostFixExpr::Index(record, index) =>
+                Expression::Index { region: record, left: Box::new(left), index },
         }
     }
 
@@ -338,8 +367,9 @@ fn factor(input: &[TokenRecord]) -> IResult<Expression> {
         expr
     )))(input)?;
 
-    let left = if let Some((_, right)) = assign {
+    let left = if let Some((l, right)) = assign {
         Expression::Assignment {
+            region: l.clone(),
             left: Box::new(left),
             right: Box::new(right)
         }
@@ -352,12 +382,12 @@ fn factor(input: &[TokenRecord]) -> IResult<Expression> {
 
 fn unary_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, op) = opt(alt((
-        map(match_token(Token::Minus), |_| UnaryOperator::Negate),
-        map(match_token(Token::Not), |_| UnaryOperator::Not),
+        map(match_token(Token::Minus), |f| (UnaryOperator::Negate, f.clone())),
+        map(match_token(Token::Not), |f| (UnaryOperator::Not, f.clone())),
     )))(input)?;
     let (input, expr) = factor(input)?;
     if let Some(op) = op {
-        Ok((input, Expression::Unary { operator: op, expr: Box::new(expr) }))
+        Ok((input, Expression::Unary { operator: op.clone(), expr: Box::new(expr) }))
     } else {
         Ok((input, expr))
     }
@@ -369,8 +399,8 @@ fn multiplicative_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = unary_expression(input)?;
     let (input, right) = opt(tuple((
         alt((
-            map(match_token(Token::Star), |_| BinaryOperator::Multiply),
-            map(match_token(Token::RSlash), |_| BinaryOperator::Divide),
+            map(match_token(Token::Star), |f| (BinaryOperator::Multiply, f.clone())),
+            map(match_token(Token::RSlash), |f| (BinaryOperator::Divide, f.clone())),
         )),
         multiplicative_expression
     )))(input)?;
@@ -389,8 +419,8 @@ fn additive_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = multiplicative_expression(input)?;
     let (input, right) = opt(tuple((
         alt((
-            map(match_token(Token::Plus), |_| BinaryOperator::Add),
-            map(match_token(Token::Minus), |_| BinaryOperator::Subtract),
+            map(match_token(Token::Plus), |f| (BinaryOperator::Add, f.clone())),
+            map(match_token(Token::Minus), |f| (BinaryOperator::Subtract, f.clone())),
         )),
         additive_expression
     )))(input)?;
@@ -409,10 +439,10 @@ fn relational_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = additive_expression(input)?;
     let (input, right) = opt(tuple((
         alt((
-            map(match_token(Token::LessThan), |_| BinaryOperator::LessThan),
-            map(match_token(Token::GreaterThan), |_| BinaryOperator::GreaterThan),
-            map(match_token(Token::LessThanEquals), |_| BinaryOperator::LessThanOrEqual),
-            map(match_token(Token::GreaterThanEquals), |_| BinaryOperator::GreaterThanOrEqual),
+            map(match_token(Token::LessThan), |f| (BinaryOperator::LessThan, f.clone())),
+            map(match_token(Token::GreaterThan), |f| (BinaryOperator::GreaterThan, f.clone())),
+            map(match_token(Token::LessThanEquals), |f| (BinaryOperator::LessThanOrEqual, f.clone())),
+            map(match_token(Token::GreaterThanEquals), |f| (BinaryOperator::GreaterThanOrEqual, f.clone())),
         )),
         relational_expression
     )))(input)?;
@@ -431,8 +461,8 @@ fn equality_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = relational_expression(input)?;
     let (input, right) = opt(tuple((
         alt((
-            map(match_token(Token::EqualsEquals), |_| BinaryOperator::Equal),
-            map(match_token(Token::NotEquals), |_| BinaryOperator::NotEqual),
+            map(match_token(Token::EqualsEquals), |f| (BinaryOperator::Equal, f.clone())),
+            map(match_token(Token::NotEquals), |f| (BinaryOperator::NotEqual, f.clone())),
         )),
         equality_expression
     )))(input)?;
@@ -452,7 +482,7 @@ fn equality_expression(input: &[TokenRecord]) -> IResult<Expression> {
 fn conditional_and_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = equality_expression(input)?;
     let (input, right) = opt(tuple((
-        map(match_token(Token::And), |_| BinaryOperator::And),
+        map(match_token(Token::And), |f| (BinaryOperator::And, f.clone())),
         conditional_and_expression
     )))(input)?;
     if let Some((op, right)) = right {
@@ -468,7 +498,7 @@ fn conditional_and_expression(input: &[TokenRecord]) -> IResult<Expression> {
 fn conditional_or_expression(input: &[TokenRecord]) -> IResult<Expression> {
     let (input, left) = conditional_and_expression(input)?;
     let (input, right) = opt(tuple((
-        map(match_token(Token::Or), |_| BinaryOperator::Or),
+        map(match_token(Token::Or), |f| (BinaryOperator::Or, f.clone())),
         conditional_or_expression
     )))(input)?;
     if let Some((op, right)) = right {

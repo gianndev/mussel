@@ -2,10 +2,11 @@
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
 // Import definitions from the parser module that are needed for evaluation.
-use crate::parser::{Atom, BinOp, Expr, Operator, parse_interpolation};
+use crate::parser::{parse_interpolation};
 use core::panic;
 // Import the HashMap collection to maintain variable bindings.
 use std::collections::HashMap;
+use crate::expr::{Atom, BinOp, Expr, Operator};
 
 // The main interpreter function that takes a vector of expressions.
 pub fn interpreter(exprs: Vec<Expr>) {

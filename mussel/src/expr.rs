@@ -1,4 +1,6 @@
 use std::fmt;
+use crate::error::{FileIdentifier, NotSupportedOperationError};
+use crate::parser2::Expression;
 
 // Define the `Atom` enum representing the basic literal values in the language.
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +36,8 @@ pub enum Operator {
     GreaterThanEqual, // Represents ">="
 }
 
+
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
     Add, // +
@@ -64,6 +68,179 @@ pub enum Expr {
     Builtin(fn(Vec<Expr>, &mut std::collections::HashMap<String, Expr>) -> Expr),
 }
 
+impl Expr {
+
+    pub fn from_parser(file: FileIdentifier, content: &str, expr: Expression) -> Result<Expr,
+        NotSupportedOperationError> {
+        Ok(match expr {
+            Expression::Include { id } => {
+                Expr::Include(id.get_content(content).to_string())
+            }
+            Expression::Return { expr } =>  {
+                Expr::Return(Box::new(Self::from_parser(file, content, *expr)?))
+            }
+            Expression::Function { id, args, block } => {
+                let name = id.get_content(content).to_string();
+                let args = args.iter()
+                    .map(|arg| arg.get_content(content).to_string())
+                    .collect::<Vec<String>>();
+                let body = Self::from_parser_block(file, content, block)?;
+                Expr::Function(name, args, body)
+            }
+            Expression::For { id, expr, block } => {
+                let name = id.get_content(content).to_string();
+                let body = Self::from_parser_block(file, content, block)?;
+                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                Expr::For(name, expr, body)
+            }
+            Expression::Until { expr, block } => {
+                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                let body = Self::from_parser_block(file, content, block)?;
+                Expr::Until(expr, body)
+            }
+            Expression::If { expr, block, else_block } => {
+                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                let body = Self::from_parser_block(file, content, block)?;
+                let else_body = if let Some(else_block) = else_block {
+                    Some(Self::from_parser_block(file, content, else_block)?)
+                } else {
+                    None
+                };
+                Expr::If(expr, body, else_body)
+            }
+            Expression::Let { id, expr } => {
+                let name = id.get_content(content).to_string();
+                let expr = Box::new(Self::from_parser(file, content, *expr)?);
+                Expr::Let(name, expr)
+            }
+            Expression::Binary { left, operator: (operator, token), right } => {
+                let lhs = Box::new(Self::from_parser(file, content, *left)?);
+                let rhs = Box::new(Self::from_parser(file, content, *right)?);
+                return if let Some(binOp) = operator.into() {
+                    Ok(Expr::Binary(lhs, binOp, rhs))
+                } else if let Some(op) = operator.into() {
+                    Ok(Expr::Compare(lhs, op, rhs))
+                } else {
+                    Err(NotSupportedOperationError::new(
+                        file,
+                        token,
+                        format!("Unsupported operator: {operator:?}"),
+                    ))
+                }
+            }
+            Expression::Unary { operator: (_, record), .. } => {
+                return Err(NotSupportedOperationError::new(
+                    file,
+                    record,
+                    "Unary operations are not supported".to_string(),
+                ));
+            }
+            Expression::Assignment { region, .. } => {
+                return Err(NotSupportedOperationError::new(
+                    file,
+                    region,
+                    "Assignment operations are not supported".to_string(),
+                ));
+            }
+            Expression::Identifier(name) => {
+                let name = name.get_content(content).to_string();
+                Expr::Constant(Atom::Name(name))
+            }
+            Expression::String(token) => {
+                let string = token.get_content(content).to_string();
+                Expr::Constant(Atom::String(string))
+            }
+            Expression::Integer(token) => {
+                let number = token.get_content(content).to_string();
+                return if let Ok(asInt) = number.parse::<i64>() {
+                    Ok(Expr::Constant(Atom::Number(asInt)))
+                } else {
+                    Err(NotSupportedOperationError::new(
+                        file,
+                        token,
+                        format!("Invalid integer: {number}"),
+                    ))
+                }
+            }
+            Expression::Float(token) => {
+                let number = token.get_content(content).to_string();
+                return if let Ok(asFloat) = number.parse::<f64>() {
+                    Ok(Expr::Constant(Atom::Float(asFloat)))
+                } else {
+                    Err(NotSupportedOperationError::new(
+                        file,
+                        token,
+                        format!("Invalid float: {number}"),
+                    ))
+                }
+            }
+            Expression::Bool(bool) => {
+                let boolean = bool.get_content(content).to_string();
+                return if let Ok(asBool) = boolean.parse::<bool>() {
+                    Ok(Expr::Constant(Atom::Boolean(asBool)))
+                } else {
+                    Err(NotSupportedOperationError::new(
+                        file,
+                        bool,
+                        format!("Invalid boolean: {boolean}"),
+                    ))
+                }
+            }
+            Expression::Array(inner) => {
+                let items = Self::from_parser_block(file, content, inner)?;
+                Expr::Array(items)
+            }
+            Expression::Closure { args, block } => {
+                let args = args.iter()
+                    .map(|arg| arg.get_content(content).to_string())
+                    .collect::<Vec<String>>();
+                let body = Self::from_parser_block(file, content, block)?;
+                Expr::Closure(args, body)
+            }
+            Expression::Call { region, left, args } => {
+                let name = Self::from_parser(file, content, *left)?;
+                let args = Self::from_parser_block(file, content, args)?;
+                return if let Expr::Constant(Atom::Name(name)) = name {
+                    Ok(Expr::Call(name.to_string(), args))
+                } else {
+                    return Err(NotSupportedOperationError::new(
+                        file,
+                        region,
+                        format!("Invalid function call, only call a function directly yet: {name}"),
+                    ));
+                }
+            }
+            Expression::Index { region, left, index } => {
+                let name = Self::from_parser(file, content, *left)?;
+                let index = Self::from_parser(file, content, *index)?;
+                return if let Expr::Constant(Atom::Name(name)) = name {
+                    if let Expr::Constant(Atom::Number(index)) = index {
+                        Ok(Expr::Get(name.to_string(), index as usize))
+                    } else {
+                        Err(NotSupportedOperationError::new(
+                            file,
+                            region,
+                            format!("Invalid index, not supported yet: {index}"),
+                        ))
+                    }
+                } else {
+                    Err(NotSupportedOperationError::new(
+                        file,
+                        region,
+                        format!("Invalid array access, not supported yet: {name}"),
+                    ))
+                }
+            }
+        })
+    }
+    fn from_parser_block(file: FileIdentifier, content: &str, block: Vec<Expression>) -> Result<Vec<Expr>, NotSupportedOperationError> {
+        block.into_iter().map(|expr| {
+            Self::from_parser(file, content, expr)
+        }).collect()
+    }
+
+}
+
 // Implement Display for Expr so that it can be printed.
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -85,3 +262,5 @@ impl fmt::Display for Expr {
         }
     }
 }
+
+

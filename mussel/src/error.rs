@@ -258,3 +258,30 @@ impl LError for UnexpectedEndOfFileError {
         vec![diagnostic]
     }
 }
+
+
+pub struct NotSupportedOperationError {
+    file: FileIdentifier,
+    record: TokenRecord,
+    message: String,
+}
+impl NotSupportedOperationError {
+    pub fn new(file: FileIdentifier, record: TokenRecord, message: String) -> Self {
+        NotSupportedOperationError {
+            file,
+            record,
+            message,
+        }
+    }
+}
+
+impl LError for NotSupportedOperationError {
+    fn report(&self) -> Vec<Diagnostic<usize>> {
+        let diagnostic = Diagnostic::error()
+            .with_message(self.message.clone())
+            .with_labels(vec![
+                label(self.file, self.record.range()),
+            ]);
+        vec![diagnostic]
+    }
+}
