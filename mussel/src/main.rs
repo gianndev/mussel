@@ -12,7 +12,7 @@ use argh::FromArgs;
 // - `Help` for error suggestions, and
 // - `Result` as a convenient alias for a Result type.
 use color_eyre::{
-    eyre::{eyre, WrapErr},
+    eyre::{WrapErr},
     Help, Result,
 };
 use crate::error::{FileError, FileIdentifier, FileSet, LError, Reporter};
@@ -23,7 +23,7 @@ mod interpreter;
 mod stdlib;
 mod error;
 mod lexer;
-mod parser2;
+mod parser;
 mod expr;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
@@ -73,7 +73,7 @@ fn parse<P: AsRef<Path>>(files: &mut FileSet, file: P) -> Result<Vec<Expr>, Box<
     let tokens = lexer::lex(files, file).map_err(|e| error::boxed(e))?;
     tokens.iter().for_each(|r| println!("{:?}", r));
 
-    let expressions= parser2::parser(file, &tokens)?;
+    let expressions= parser::parser(file, &tokens)?;
     expressions.iter().for_each(|r| println!("{:?}", r));
 
     Expr::from_parser(&files, file, expressions).map_err(|e| error::boxed(e))

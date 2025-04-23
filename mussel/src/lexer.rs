@@ -4,10 +4,8 @@
 extern crate nom;
 extern crate nom_locate;
 
-use std::error::Error;
 use std::ops::Range;
-use color_eyre::eyre::eyre;
-use color_eyre::{Report, Section};
+use color_eyre::{Section};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::bytes::complete::{take_while, take_while1};

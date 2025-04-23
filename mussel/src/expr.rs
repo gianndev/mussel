@@ -1,6 +1,6 @@
 use std::fmt;
 use crate::error::{FileIdentifier, FileSet, NotSupportedOperationError};
-use crate::parser2::Expression;
+use crate::parser::Expression;
 
 // Define the `Atom` enum representing the basic literal values in the language.
 #[derive(Debug, Clone, PartialEq)]
