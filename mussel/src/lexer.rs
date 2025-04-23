@@ -17,7 +17,7 @@ use nom::combinator::{map, map_res, opt, recognize};
 use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::InputLength;
 use nom::multi::many0;
-use nom::sequence::{delimited, pair};
+use nom::sequence::{delimited, pair, tuple};
 use nom_locate::{position, LocatedSpan};
 use nom_supreme::final_parser::{final_parser, ExtractContext};
 use crate::error;
@@ -190,7 +190,7 @@ fn comment(input: Span) -> IResult<Token> {
 /// Matches the following regex: [0-9]+(\.[0-9]+)?
 fn number(input: Span) -> IResult<Token> {
     map_res(
-        recognize(pair(digit1, opt(pair(char('.'), digit1)))),
+        recognize(tuple((opt(char('-')), digit1, opt(pair(char('.'), digit1))))),
         |num_str: Span| {
             if num_str.contains('.') {
                 Ok::<Token, TokenError>(Token::Float)
@@ -240,8 +240,8 @@ fn one_token(input: Span) -> IResult<TokenRecord> {
     let result = alt((
         whitespace,
         comment,
-        simple_token,
         number,
+        simple_token,
         string_literal,
         identifier,
     ))(input)?;
