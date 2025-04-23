@@ -158,6 +158,14 @@ impl Expr {
             }
             Expression::String(token) => {
                 let string = token.get_content(content).to_string();
+                if (string.len() < 2) {
+                    return Err(NotSupportedOperationError::new(
+                        file,
+                        token,
+                        format!("Invalid string: {string}"),
+                    ));
+                }
+                let string = string[1..string.len() - 1].to_string();
                 Expr::Constant(Atom::String(string))
             }
             Expression::Integer(token) => {
