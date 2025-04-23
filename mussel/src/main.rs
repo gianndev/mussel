@@ -18,10 +18,8 @@ use color_eyre::{
 use crate::error::{FileError, FileIdentifier, FileSet, LError, Reporter};
 use crate::expr::Expr;
 
-// Declare the modules that are defined in separate files.
-// Rust will look for "interpreter.rs" and "parser.rs" in the same directory.
+
 mod interpreter;
-mod parser;
 mod stdlib;
 mod error;
 mod lexer;
