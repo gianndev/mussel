@@ -8,13 +8,8 @@ use argh::FromArgs;
 
 // Import items from the `color_eyre` crate. The nested imports include:
 // - `eyre` for creating error reports,
-// - `WrapErr` to add context to errors,
-// - `Help` for error suggestions, and
 // - `Result` as a convenient alias for a Result type.
-use color_eyre::{
-    eyre::{WrapErr},
-    Help, Result,
-};
+use color_eyre::Result;
 use crate::error::{FileError, FileIdentifier, FileSet, LError, Reporter};
 use crate::expr::Expr;
 
@@ -71,10 +66,8 @@ fn parse<P: AsRef<Path>>(files: &mut FileSet, file: P) -> Result<Vec<Expr>, Box<
     let file = load_file(files, &file).map_err(|e| error::boxed(e))?;
 
     let tokens = lexer::lex(files, file).map_err(|e| error::boxed(e))?;
-    tokens.iter().for_each(|r| println!("{:?}", r));
 
     let expressions= parser::parser(file, &tokens)?;
-    expressions.iter().for_each(|r| println!("{:?}", r));
 
     Expr::from_parser(&files, file, expressions).map_err(|e| error::boxed(e))
 }
