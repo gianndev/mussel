@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
 // Import definitions from the parser module that are needed for evaluation.
-use crate::parser::{Atom, BinOp, Expr, Operator, parse_interpolation};
 use core::panic;
 // Import the HashMap collection to maintain variable bindings.
 use std::collections::HashMap;
+use crate::expr::{Atom, BinOp, Expr, Operator};
 
 // The main interpreter function that takes a vector of expressions.
 pub fn interpreter(exprs: Vec<Expr>) {
@@ -27,35 +27,7 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         // For a return expression, evaluate the inner expression and re-wrap it.
         Expr::Return(expr) => Expr::Return(Box::new(interpreter_expr(*expr, context))),
         // If the expression is a string constant, attempt to parse interpolation.
-        Expr::Constant(Atom::String(ref string)) => match parse_interpolation(string) {
-            Ok((_, exprs)) => {
-                // If there is zero or one interpolated expression, leave it unchanged.
-                match exprs.len() {
-                    0 | 1 => return expr,
-                    _ => {
-                        // Otherwise, create an output string and evaluate each interpolated expression.
-                        let mut output = String::with_capacity(string.len());
-                        for mut expr in exprs {
-                            // Continue evaluating until the expression no longer changes.
-                            loop {
-                                let new_expr = interpreter_expr(expr.clone(), context);
-                                if expr == new_expr {
-                                    break;
-                                } else {
-                                    expr = new_expr;
-                                }
-                            }
-                            // Append the evaluated expression's string representation.
-                            output.push_str(&expr.to_string());
-                        }
-                        // Return a new constant with the fully interpolated string.
-                        return Expr::Constant(Atom::String(output));
-                    }
-                }
-            }
-            // If interpolation parsing fails, return the original expression.
-            _ => expr,
-        },
+        Expr::Constant(Atom::String(ref string)) => Expr::Constant(Atom::String(string.to_string())),
         // If the constant is a name, look it up in the context.
         Expr::Constant(ref atom) => match atom {
             Atom::Name(name) => context

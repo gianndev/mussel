@@ -1,9 +1,10 @@
 // Copyright (c) 2025 Francesco Giannice
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
-use crate::parser::{Atom, Expr};
 use std::collections::HashMap;
-use rand::Rng;  // Ensure you have added rand = "0.8" (or a recent version) in Cargo.toml
+use rand::Rng;
+use crate::expr::{Atom, Expr};
+// Ensure you have added rand = "0.8" (or a recent version) in Cargo.toml
 
 // This function will be called when the user writes "include random"
 pub fn load(context: &mut HashMap<String, Expr>) {

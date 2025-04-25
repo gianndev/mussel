@@ -8,21 +8,18 @@ use argh::FromArgs;
 
 // Import items from the `color_eyre` crate. The nested imports include:
 // - `eyre` for creating error reports,
-// - `WrapErr` to add context to errors,
-// - `Help` for error suggestions, and
 // - `Result` as a convenient alias for a Result type.
-use color_eyre::{
-    eyre::{eyre, WrapErr},
-    Help, Result,
-};
-use crate::error::{FileError, FileIdentifier, FileSet, Reporter};
+use color_eyre::Result;
+use crate::error::{FileError, FileIdentifier, FileSet, LError, Reporter};
+use crate::expr::Expr;
 
-// Declare the modules that are defined in separate files.
-// Rust will look for "interpreter.rs" and "parser.rs" in the same directory.
+
 mod interpreter;
-mod parser;
 mod stdlib;
 mod error;
+mod lexer;
+mod parser;
+mod expr;
 
 // Derive the `FromArgs` trait automatically so that command-line arguments can be parsed.
 // The doc-comment (triple slash) describes the application when running the help command.
@@ -46,9 +43,7 @@ fn main() -> Result<()> {
     // Create a new `FileSet` instance to manage files.
     let mut files = FileSet::new();
 
-    // Load the file specified in the command-line arguments into the `FileSet`.
-    // If loading fails, print the error using the `Reporter` and return early.
-    let input = match load_file(&mut files, &file) {
+    let parsed = match parse(&mut files, file) {
         Ok(file_id) => file_id,
         Err(error) => {
             let reporter = Reporter::new(files);
@@ -56,21 +51,25 @@ fn main() -> Result<()> {
             return Ok(());
         }
     };
-    // When the file is loaded successfully, retrieve its content.
-    let file_content = files.get_content(input).unwrap_or_else(|| {
-        // This should never happen. Every FileIdentifier should be valid.
-        panic!("Failed to retrieve content");
-    });
 
-    // Call the parser from the `parser` module to turn the input into expressions.
-    // If parsing fails, convert the error into an eyre error with detailed debugging information.
-    let exprs =
-        parser::parser(file_content).map_err(|error| eyre!("Error occurred while parsing: {error:#?}"))?;
     // Pass the parsed expressions to the interpreter to evaluate them.
-    interpreter::interpreter(exprs);
+    interpreter::interpreter(parsed);
 
     // Return success.
     Ok(())
+}
+
+fn parse<P: AsRef<Path>>(files: &mut FileSet, file: P) -> Result<Vec<Expr>, Box<dyn LError>> {
+
+    // Load the file specified in the command-line arguments into the `FileSet`.
+    // If loading fails, print the error using the `Reporter` and return early.
+    let file = load_file(files, &file).map_err(|e| error::boxed(e))?;
+
+    let tokens = lexer::lex(files, file).map_err(|e| error::boxed(e))?;
+
+    let expressions= parser::parser(file, &tokens)?;
+
+    Expr::from_parser(&files, file, expressions).map_err(|e| error::boxed(e))
 }
 
 
