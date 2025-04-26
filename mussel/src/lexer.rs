@@ -9,7 +9,7 @@ use color_eyre::{Section};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::bytes::complete::{take_while, take_while1};
-use nom::character::complete::{char, multispace1};
+use nom::character::complete::{char, multispace1, not_line_ending};
 use nom::character::complete::digit1;
 use nom::combinator::{map, map_res, opt, recognize};
 use nom::error::{ErrorKind, FromExternalError, ParseError};
@@ -175,7 +175,7 @@ fn whitespace(input: Span) -> IResult<Token> {
 /// Tests for comments. Will be filtered out
 fn comment(input: Span) -> IResult<Token> {
     alt((
-        map(delimited(tag("//"), take_until("\n"), tag("\n")), |_| {
+        map(delimited(tag("//"), not_line_ending, opt(tag("\n"))), |_| {
             Token::Ignore
         }),
         map(delimited(tag("/*"), take_until("*/"), tag("*/")), |_| {
