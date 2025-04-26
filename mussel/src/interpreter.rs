@@ -56,6 +56,36 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
                         } else {
                             format!("{{{placeholder}}}")
                         }
+                    } else if placeholder.contains(' ') {
+                        // Handle arithmetic expressions like `end - start`
+                        let tokens: Vec<&str> = placeholder.split_whitespace().collect();
+                        if tokens.len() == 3 {
+                            let left = tokens[0];
+                            let operator = tokens[1];
+                            let right = tokens[2];
+
+                            if let (Some(Expr::Constant(Atom::Number(left_val))),
+                                    Some(Expr::Constant(Atom::Number(right_val)))) =
+                                (context.get(left), context.get(right)) {
+                                match operator {
+                                    "+" => (left_val + right_val).to_string(),
+                                    "-" => (left_val - right_val).to_string(),
+                                    "*" => (left_val * right_val).to_string(),
+                                    "/" => {
+                                        if *right_val == 0 {
+                                            "Division by zero".to_string()
+                                        } else {
+                                            (left_val / right_val).to_string()
+                                        }
+                                    },
+                                    _ => format!("{{{placeholder}}}"),
+                                }
+                            } else {
+                                format!("{{{placeholder}}}")
+                            }
+                        } else {
+                            format!("{{{placeholder}}}")
+                        }
                     } else {
                         // Handle simple variable interpolation
                         context.get(placeholder).map_or_else(
