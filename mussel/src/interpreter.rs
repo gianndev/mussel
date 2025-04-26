@@ -27,7 +27,19 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         // For a return expression, evaluate the inner expression and re-wrap it.
         Expr::Return(expr) => Expr::Return(Box::new(interpreter_expr(*expr, context))),
         // If the expression is a string constant, attempt to parse interpolation.
-        Expr::Constant(Atom::String(ref string)) => Expr::Constant(Atom::String(string.to_string())),
+        Expr::Constant(Atom::String(ref string)) => {
+            let interpolated = string.replace("{", "{{").replace("}", "}}");
+            let mut result = interpolated.clone();
+            for (key, value) in context {
+                let placeholder = format!("{{{{{key}}}}}");
+                if let Expr::Constant(Atom::Number(num)) = value {
+                    result = result.replace(&placeholder, &num.to_string());
+                } else if let Expr::Constant(Atom::String(val)) = value {
+                    result = result.replace(&placeholder, val);
+                }
+            }
+            Expr::Constant(Atom::String(result))
+        }
         // If the constant is a name, look it up in the context.
         Expr::Constant(ref atom) => match atom {
             Atom::Name(name) => context
