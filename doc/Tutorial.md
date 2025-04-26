@@ -7,7 +7,7 @@ Consider this file as a tutorial that explains how the **Mussel programming lang
 Mussel supports the following basic data types:
 
 - **Strings**: only supported between double quotes `"`
-- **Integers**: both positive and nevative numbers are supported
+- **Integers**: both positive and negative numbers are supported
 - **Float numbers**: they use the dot `.` to separate the whole part from the decimal part in numbers (like `3.14`)
 - **Booleans**: they are basically only `true` and `false` (both must be lowercase)
 - **Arrays**: a list of values stored between square brackets and separated by a `,` (like `[1, 2, 3, 4]`)
@@ -27,7 +27,7 @@ let letters = ["a", "b", "c", "d", "e", "f"] // array
 For variable names, the use of `_` has recently been supported. This allows both Camel case and Snake case notation to be used.
 
 ## println() function
-To print somethin on screen, like the content of a variable, you can use the `println()` function
+To print something on screen, like the content of a variable, you can use the `println()` function
 
 ```
 let greet = "Hello dude!"
@@ -82,7 +82,7 @@ for num in numbers {
 ```
 
 ## *until* loop
-The until loop executes a code as long as a given condition is true: it is the equivalent of the *while loop* in Mussel (in fact i think *until* is a better key-word than *while*)
+The until loop executes a code as long as a given condition is true: it is the equivalent of the *while loop* in Mussel (in fact, *until* is a better key-word than *while*)
 
 ```
 let variable = 1
@@ -96,7 +96,7 @@ until variable != 1 {
 ## Arrays
 Arrays are defined with square brackets and elements separated by commas. You can access elements using the Get expression (using square brackets after a variable name).
 
-⚠️ *Like most of programming languges out there, in Mussel the first element of the array has position 0, and the second element has the position number 1*
+⚠️ *Like most programming languages out there, in Mussel the first element of the array has position 0, and the second element has the position number 1*
 
 ```
 let fruits = ["apple", "banana", "cherry"]
@@ -104,7 +104,7 @@ println(fruits[1])
 ```
 
 ## String Interpolation
-Mussel supports interpolation inside string literals. When a string contains curly braces {...}, the interpreter attempts to parse and evaluate the expression inside the braces, then inserts the result into the string.
+Mussel supports interpolation inside string literals. When a string contains curly braces `{...}`, the interpreter attempts to parse and evaluate the expression inside the braces, then inserts the result into the string.
 
 ```
 let name = "Alice"
@@ -117,7 +117,7 @@ Functions are defined with the `fn` keyword. A function includes a name, paramet
 Example of function definition:
 
 ```
-// Defined a function to add two numbers
+// Define a function to add two numbers
 fn add_numbers(a, b) {
     return a + b
 }
@@ -138,7 +138,14 @@ To add a comment in Mussel code, use `//` for inline comments.
 println("Hello") // prints a string
 ```
 
-⚠️ *Multiline comments are not supported yet, but you can use `//` for multiple lines if necessary*
+⚠️ *Multiline comments are now supported using `/*` and `*/`.*
+
+```
+/*
+This is a multiline comment
+spanning multiple lines
+*/
+```
 
 ## Standard Library
 
