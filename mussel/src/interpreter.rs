@@ -28,16 +28,49 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         Expr::Return(expr) => Expr::Return(Box::new(interpreter_expr(*expr, context))),
         // If the expression is a string constant, attempt to parse interpolation.
         Expr::Constant(Atom::String(ref string)) => {
-            let interpolated = string.replace("{", "{{").replace("}", "}}");
-            let mut result = interpolated.clone();
-            for (key, value) in context {
-                let placeholder = format!("{{{{{key}}}}}");
-                if let Expr::Constant(Atom::Number(num)) = value {
-                    result = result.replace(&placeholder, &num.to_string());
-                } else if let Expr::Constant(Atom::String(val)) = value {
-                    result = result.replace(&placeholder, val);
+            let mut result = string.clone();
+            let mut start = 0;
+
+            while let Some(open) = result[start..].find('{') {
+                if let Some(close) = result[start + open..].find('}') {
+                    let placeholder = &result[start + open + 1..start + open + close];
+                    let value = if placeholder.contains('[') {
+                        // Handle array access like `fruits[1]`
+                        let parts: Vec<&str> = placeholder.split('[').collect();
+                        if parts.len() == 2 {
+                            let array_name = parts[0];
+                            let index_str = parts[1].trim_end_matches(']');
+                            if let Ok(index) = index_str.parse::<usize>() {
+                                if let Some(Expr::Array(items)) = context.get(array_name) {
+                                    if let Some(item) = items.get(index) {
+                                        item.to_string()
+                                    } else {
+                                        format!("{{{placeholder}}}")
+                                    }
+                                } else {
+                                    format!("{{{placeholder}}}")
+                                }
+                            } else {
+                                format!("{{{placeholder}}}")
+                            }
+                        } else {
+                            format!("{{{placeholder}}}")
+                        }
+                    } else {
+                        // Handle simple variable interpolation
+                        context.get(placeholder).map_or_else(
+                            || format!("{{{placeholder}}}"),
+                            |expr| expr.to_string(),
+                        )
+                    };
+
+                    result.replace_range(start + open..start + open + close + 1, &value);
+                    start += open + value.len();
+                } else {
+                    break;
                 }
             }
+
             Expr::Constant(Atom::String(result))
         }
         // If the constant is a name, look it up in the context.
