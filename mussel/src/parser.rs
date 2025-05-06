@@ -1,459 +1,642 @@
 // Copyright (c) 2025 Francesco Giannice
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
-// Import various combinators and types from the `nom` crate which is used for parsing.
-use nom::{
-    Parser,
-    branch::alt, // `alt` tries multiple parsers in order until one succeeds.
-    bytes::complete::{is_not, take_until, take_while, tag}, // Parsers for matching parts of a string.
-    character::complete::{alpha1, digit1, line_ending, alphanumeric1}, // Parsers for alphabetic characters, digits, and whitespace.
-    combinator::{map, opt, recognize}, // `map` transforms parser output; `opt` makes a parser optional; `recognize` returns the matched slice.
-    multi::{many0, separated_list0, fold_many0}, // `many0` for zero or more occurrences; `separated_list0` for a list with a separator.
-    number::complete::double, // Parser to match a floating point number.
-    sequence::{delimited, pair, preceded, separated_pair, tuple, terminated}, // Combinators for parsing sequences.
-};
-// Import enhanced error reporting and additional parser functionality from the `nom_supreme` crate.
-use nom_supreme::{
-    error::ErrorTree, // An error type that provides detailed error trees.
-    final_parser::final_parser, // Helper to run a parser until the end of input.
-    ParserExt, // Extension traits for parsers.
-};
+use color_eyre::{Help};
+use nom::multi::{many0, separated_list0};
+use nom::{Parser};
+use nom::branch::alt;
+use nom::combinator::{cut, map, opt};
+use nom::sequence::{delimited, tuple};
+use nom_supreme::final_parser::{final_parser, ExtractContext};
+use crate::error;
+use crate::error::{FileIdentifier, LError};
+use crate::expr::{BinOp, Operator};
+use crate::lexer::{Token, TokenRecord};
 
-// Import standard formatting traits for implementing display functionality.
-use std::fmt;
 
-// Define a type alias `Span` for a string slice, which is used as the input type for our parsers.
-type Span<'a> = &'a str;
-// Define a type alias for parser results that includes our custom error type.
-type IResult<'a, O> = nom::IResult<Span<'a>, O, ErrorTree<Span<'a>>>;
 
-// A helper function to wrap another parser with optional whitespace on both sides.
-// It uses `delimited` to apply `multispace0` before and after the inner parser.
-fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<O>
-where
-    F: FnMut(&'a str) -> IResult<O>,
-{
-    delimited(skip_ws_comments, inner, skip_ws_comments)
+/// This is the main parser for the language.
+/// It takes a slice of tokens and returns an AST.
+///
+///
+///
+/// # Grammar
+///
+/// ```
+/// // Entry point
+/// unit ::= expr*
+///
+/// expr ::= include
+///     | return
+///     | function
+///     | for
+///     | until
+///     | if
+///     | let
+///     | conditionalOrExpression
+///
+/// include ::= 'include' id
+/// return ::= 'return' expr
+/// function ::= 'fn' id '(' (id (',' id)*)? ')' block
+/// for ::= 'for' id 'in' expr block
+/// until ::= 'until' expr block
+/// if ::= 'if' expr block ('else' block)?
+/// let ::= 'let' id '=' expr
+///
+/// block ::= '{' expr* '}'
+///
+/// // Math precedence
+/// conditionalOrExpression: conditionalAndExpression ('||' conditionalOrExpression)?;
+/// conditionalAndExpression: equalityExpression ('&&' conditionalAndExpression)?;
+/// equalityExpression: relationalExpression (('==' | '!=') equalityExpression)?;
+/// relationalExpression: additiveExpression (('<' | '>' | '<=' | '>=') relationalExpression)?;
+/// additiveExpression: multiplicativeExpression (('+' | '-') additiveExpression)?;
+/// multiplicativeExpression: unaryExpression (('*' | '/') multiplicativeExpression)?;
+/// unaryExpression: ('-' | '!')? factor;
+///
+/// factor: object postFix* ('=' expr)?;
+/// // calls and array indexing
+/// postFix: '(' expressionList ')' | '[' expr ']';
+/// expressionList: (expr (',' expr)*)?;
+///
+/// // lowest expression
+/// object: array | closure | string | integer | float | bool | id | '(' expr ')'
+///
+/// array ::= '[' (expr (',' expr)*)? ']'
+/// closure ::= '|' (id (',' id)*)? '|' block
+///
+/// # literals
+/// id ::= 'id'
+/// string ::= 'string'
+/// integer ::= 'integer'
+/// float ::= 'float'
+/// bool ::= 'true' | 'false'
+/// ```
+
+
+
+/// Defines a custom Result type with the input of TokenRecords and the custom ErrorType
+type IResult<'a, O> = nom::IResult<&'a [TokenRecord], O, ParseError>;
+
+/// Used to define where an Expression was defined. Currently not used.
+type Range = core::ops::Range<usize>;
+
+
+/// Custom Error Type for better error reporting
+/// `self.get_offset` returns where the error occurred in the input stream (character index)
+/// `self.to_string` returns a readable error message.
+///
+/// implements `ParseError` to use as a nom error
+pub(crate) enum ParseError {
+
+    // Unexpected Token
+    UnexpectedToken { found: TokenRecord, expected: Token },
+
+    // Fallback when the parser reaches the end of the input
+    Eof,
+
+    // Unexpected Token
+    UnexpectedEnd { found: TokenRecord },
+
+    // nom::error::ErrorKind is the standard nom error, needed for ParseError
+    Internal { record: TokenRecord, kind: nom::error::ErrorKind },
+
+    // Combining multiple errors
+    // fixme: This might not be useful for the user in the future
+    List(Vec<ParseError>)
 }
 
-fn skip_ws_comments(input: Span) -> IResult<()> {
-    let line_comment = preceded(
-        tag("//"),
-        terminated(
-            take_while(|c| c != '\n' && c != '\r'),
-            opt(line_ending)
-        )
-    ).map(|_| ());
-    
-    // Use multispace1 to ensure at least one whitespace character is consumed.
-    let whitespace = nom::character::complete::multispace1.map(|_| ());
-    
-    // Try to consume a comment before falling back to whitespace.
-    let mut parser = many0(alt((
-        line_comment,
-        whitespace,
-    )));
-    
-    let (input, _) = parser(input)?;
-    Ok((input, ()))
-}
+impl<'a> nom::error::ParseError<&'a [TokenRecord]> for ParseError {
+    fn from_error_kind(input: &'a [TokenRecord], kind: nom::error::ErrorKind) -> Self {
 
-// Define the `Atom` enum representing the basic literal values in the language.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Atom {
-    Number(i64),   // Represents an integer.
-    Float(f64),    // Represents a floating-point number.
-    Boolean(bool), // Represents a boolean value.
-    Name(String),  // Represents an identifier.
-    String(String),// Represents a string literal.
-}
 
-// Implement the Display trait for Atom so that it can be converted to a user-friendly string.
-impl fmt::Display for Atom {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Atom::Number(number) => write!(f, "{number}"), // Write the number.
-            Atom::Float(float) => write!(f, "{float}"), // Write the float.
-            Atom::Boolean(boolean) => write!(f, "{boolean}"), // Write the boolean.
-            Atom::Name(name) => write!(f, "{name}"), // Write the name.
-            Atom::String(string) => write!(f, "{string}"), // Write the string.
-        }
-    }
-}
-
-/// Parse an identifier: starts with [A-Za-z_] then zero or more [A-Za-z0-9_],
-fn parse_identifier(input: &str) -> IResult<String> {
-    // first char must be a letter or underscore
-    let first = alt((alpha1, tag("_")));
-    // subsequent chars can be alphanumeric or underscore
-    let rest = many0(alt((alphanumeric1, tag("_"))));
-    // combine and give a useful error if it fails
-    let parser = recognize(pair(first, rest))
-        .context("expected identifier starting with letter or underscore");
-    // slice to owned
-    map(parser, |s: &str| s.to_string())(input)
-}
-
-// Parse a name by wrapping the variable parser into an Atom::Name.
-fn parse_name(input: &str) -> IResult<Atom> {
-    map(parse_identifier, Atom::Name)(input)
-}
-
-// Parse a string literal enclosed in double quotes.
-fn parse_string(input: &str) -> IResult<Atom> {
-    let parser = delimited(tag("\""), take_until("\""), tag("\""))
-        .context("String is incomplete"); // Ensure that the string is properly closed.
-    map(parser, |string: &str| Atom::String(string.to_string()))(input)
-}
-
-// Parse an integer number, possibly with a leading minus sign.
-fn parse_number(input: &str) -> IResult<Atom> {
-    let parser = recognize(pair(opt(tag("-")), digit1)); // Recognize an optional "-" followed by digits.
-    map(parser, |number: &str| Atom::Number(number.parse().unwrap()))(input)
-}
-
-// Parse a floating point number using the `double` parser.
-fn parse_float(input: &str) -> IResult<Atom> {
-    map(double, Atom::Float)(input)
-}
-
-// Parse a boolean literal, either "true" or "false".
-fn parse_boolean(input: &str) -> IResult<Atom> {
-    let parser = alt((
-        map(tag("true"), |_| true),
-        map(tag("false"), |_| false),
-    ));
-    map(parser, Atom::Boolean)(input)
-}
-
-// Attempt to parse any kind of atom by trying each parser in order.
-fn parse_atom(input: &str) -> IResult<Atom> {
-    alt((
-        parse_string,
-        parse_number,
-        parse_float,
-        parse_boolean,
-        parse_name,
-    ))(input)
-}
-
-// Define an enum for comparison operators.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Operator {
-    Equal,            // Represents "=="
-    NotEqual,         // Represents "!="
-    LessThan,         // Represents "<"
-    LessThanEqual,    // Represents "<="
-    GreaterThan,      // Represents ">"
-    GreaterThanEqual, // Represents ">="
-}
-
-// Parse an operator by trying to match each literal string.
-fn parse_operator(input: &str) -> IResult<Operator> {
-    alt((
-        map(tag("=="), |_| Operator::Equal),
-        map(tag("!="), |_| Operator::NotEqual),
-        map(tag("<="), |_| Operator::LessThanEqual),
-        map(tag("<"), |_| Operator::LessThan),
-        map(tag(">="), |_| Operator::GreaterThanEqual),
-        map(tag(">"), |_| Operator::GreaterThan),
-    ))(input)
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum BinOp {
-    Add, // +
-    Sub, // -
-    Mul, // *
-    Div, // /
-}
-
-// Define an enum for expressions in the language.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Void, // Represents a no-value or empty expression.
-    Array(Vec<Expr>), // Represents an array of expressions.
-    Constant(Atom), // Wraps an Atom literal as an expression.
-    Let(String, Box<Expr>), // A let-binding that associates a name with an expression (boxed to allow recursion).
-    Call(String, Vec<Expr>), // A function call with a name and arguments.
-    Compare(Box<Expr>, Operator, Box<Expr>), // A comparison between two expressions.
-    Closure(Vec<String>, Vec<Expr>), // A closure with parameters and a body of expressions.
-    Function(String, Vec<String>, Vec<Expr>), // A named function definition.
-    If(Box<Expr>, Vec<Expr>, Option<Vec<Expr>>), // An if statement with an optional else branch.
-    Return(Box<Expr>), // A return expression.
-    For(String, Box<Expr>, Vec<Expr>), // A for loop iterating over a collection.
-    Get(String, usize), // Access an element in an array by name and index.
-    Until(Box<Expr>, Vec<Expr>), // An until loop: execute the body until the condition becomes true.
-    Binary(Box<Expr>, BinOp, Box<Expr>), // Binary arithmetic expression.
-    Include(String),
-    Builtin(fn(Vec<Expr>, &mut std::collections::HashMap<String, Expr>) -> Expr),
-}
-
-// Implement Display for Expr so that it can be printed.
-impl fmt::Display for Expr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            // For constant expressions, delegate to Atom's display.
-            Expr::Constant(atom) => write!(f, "{atom}"),
-            // For arrays, manually format each element.
-            Expr::Array(items) => {
-                write!(f, "[")?;
-                for (i, expr) in items.iter().enumerate() {
-                    write!(f, "{expr}")?;
-                    if i + 1 < items.len() {
-                        write!(f, ", ")?;
-                    }
+        if let Some((first, _)) = input.split_first() {
+            if kind == nom::error::ErrorKind::Eof {
+                ParseError::UnexpectedEnd {
+                    found: first.clone()
                 }
-                write!(f, "]")
+            } else {
+                ParseError::Internal {
+                    record: first.clone(),
+                    kind
+                }
             }
-            _ => Ok(()), // For other expressions, do nothing.
+        } else {
+            ParseError::Eof
+        }
+    }
+
+    fn append(input: &'a [TokenRecord], kind: nom::error::ErrorKind, other: Self) -> Self {
+        let fst = if let Some((first, _)) = input.split_first() {
+            ParseError::Internal {
+                record: first.clone(),
+                kind
+            }
+        } else {
+            ParseError::Eof
+        };
+        ParseError::List(vec![fst, other])
+    }
+
+    fn from_char(input: &'a [TokenRecord], _c: char) -> Self {
+        if let Some((first, _)) = input.split_first() {
+            ParseError::UnexpectedToken {
+                found: first.clone(),
+                expected: Token::Identifier,
+            }
+        } else {
+            ParseError::Eof
+        }
+    }
+
+    fn or(self, other: Self) -> Self {
+        ParseError::List(vec![self, other])
+    }
+}
+impl ExtractContext<&[TokenRecord], ParseError> for ParseError {
+    fn extract_context(self, _: &[TokenRecord]) -> ParseError {
+        self
+    }
+}
+
+pub fn offset_to_line_column(text: &str, offset: usize) -> Option<(usize, usize)> {
+    if offset > text.len() {
+        return None;
+    }
+
+    let mut current_offset = 0;
+    for (line_number, line) in text.lines().enumerate() {
+        let line_len = line.len();
+
+        if offset <= current_offset + line_len {
+            let column = offset - current_offset + 1;
+            return Some((line_number + 1, column));
+        }
+
+        // Add 1 for the '\n' character that .lines() strips
+        current_offset += line_len + 1;
+    }
+
+    // If offset is at the very end (after the last line)
+    if offset == text.len() {
+        if let Some(last_line_number) = text.lines().count().checked_sub(1) {
+            return Some((last_line_number + 1, text.lines().last().unwrap_or("").len() + 1));
+        }
+    }
+
+    None
+}
+
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum BinaryOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    And,
+    Or,
+    Equal,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+}
+
+impl Into<Option<BinOp>> for BinaryOperator {
+    fn into(self) -> Option<BinOp> {
+        match self {
+            BinaryOperator::Add => Some(BinOp::Add),
+            BinaryOperator::Subtract => Some(BinOp::Sub),
+            BinaryOperator::Multiply => Some(BinOp::Mul),
+            BinaryOperator::Divide => Some(BinOp::Div),
+            _ => None,
         }
     }
 }
 
-// Parse a constant expression from an atom.
-fn parse_constant(input: &str) -> IResult<Expr> {
-    map(parse_atom, Expr::Constant)(input)
+impl Into<Option<Operator>> for BinaryOperator {
+    fn into(self) -> Option<Operator> {
+        match self {
+            BinaryOperator::Equal => Some(Operator::Equal),
+            BinaryOperator::NotEqual => Some(Operator::NotEqual),
+            BinaryOperator::LessThan => Some(Operator::LessThan),
+            BinaryOperator::GreaterThan => Some(Operator::GreaterThan),
+            BinaryOperator::LessThanOrEqual => Some(Operator::LessThanEqual),
+            BinaryOperator::GreaterThanOrEqual => Some(Operator::GreaterThanEqual),
+            _ => None,
+        }
+    }
 }
 
-// Parse an expression that can validly be compared, like a function call or constant.
-fn parse_compare_valid(input: &str) -> IResult<Expr> {
-    alt((parse_call, parse_constant))(input)
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum UnaryOperator {
+    Negate,
+    Not,
 }
 
-// Parse a comparison expression.
-fn parse_compare(input: &str) -> IResult<Expr> {
-    // Parse a tuple containing left expression, operator (with surrounding whitespace), and right expression.
-    let parser = tuple((parse_compare_valid, ws(parse_operator), parse_compare_valid));
-    map(parser, |(left, operator, right)| {
-        Expr::Compare(Box::new(left), operator, Box::new(right))
-    })(input)
+#[derive(Debug)]
+pub(crate) enum Expression {
+    Include { id: TokenRecord},
+    Return { expr: Box<Expression> },
+    Function { id: TokenRecord, args: Vec<TokenRecord>, block: Vec<Expression> },
+    For { id: TokenRecord, expr: Box<Expression>, block: Vec<Expression> },
+    Until { expr: Box<Expression>, block: Vec<Expression> },
+    If { expr: Box<Expression>, block: Vec<Expression>, else_block: Option<Vec<Expression>> },
+    Let { id: TokenRecord, expr: Box<Expression> },
+
+    Binary { left: Box<Expression>, operator: (BinaryOperator, TokenRecord), right: Box<Expression> },
+    Unary { operator: (UnaryOperator, TokenRecord), expr: Box<Expression> },
+
+    Assignment { region: TokenRecord, left: Box<Expression>, right: Box<Expression> },
+
+    Identifier(TokenRecord),
+    String(TokenRecord),
+    Integer(TokenRecord),
+    Float(TokenRecord),
+    Bool(TokenRecord),
+    Array(Vec<Expression>),
+    Closure { args: Vec<TokenRecord>, block: Vec<Expression> },
+
+    Call { region: TokenRecord, left: Box<Expression>, args: Vec<Expression> },
+    Index { region: TokenRecord, left: Box<Expression>, index: Box<Expression> },
 }
 
-// Parse a let-binding expression.
-fn parse_let(input: &str) -> IResult<Expr> {
-    // Parse a pair: a variable, an "=" (with surrounding whitespace), and an expression.
-    let parse_statement = separated_pair(parse_identifier, ws(tag("=")), parse_expr);
-    // Precede the statement with the "let" keyword.
-    let parser = preceded(ws(tag("let")), parse_statement)
-        .context("Invalid let statement");
-    map(parser, |(name, expr)| Expr::Let(name, Box::new(expr)))(input)
+
+/// Represents a Call or Index. This is turned into a `Expression` in the `factor` method
+/// The Call and Index expression store the left side of the expression, so this extra step is
+/// needed to satisfy the borrow checker.
+enum PostFixExpr {
+    Call(TokenRecord, Vec<Expression>),
+    Index(TokenRecord, Box<Expression>),
 }
 
-// Parse a function call.
-fn parse_call(input: &str) -> IResult<Expr> {
-    // Parse function call arguments: a list of expressions separated by commas inside parentheses.
-    let parse_args = delimited(
-        tag("("),
-        separated_list0(tag(","), ws(parse_expr)),
-        tag(")"),
-    );
-    // Parse the function name followed by its arguments.
-    let parser = pair(parse_identifier, parse_args).context("Invalid function call");
-    map(parser, |(name, args)| Expr::Call(name, args))(input)
+
+
+/// This Function test for a specific token type.
+fn match_token<'a>(expected: Token) -> impl Fn(&'a [TokenRecord]) -> IResult<&'a TokenRecord> {
+    move |input: &'a [TokenRecord]| {
+        if let Some((first, rest)) = input.split_first() {
+            if first.token_type == expected {
+                Ok((rest, first))
+            } else {
+                Err(nom::Err::Error(ParseError::UnexpectedToken {
+                    found: first.clone(),
+                    expected,
+                }))
+            }
+        } else {
+            Err(nom::Err::Error(ParseError::Eof))
+        }
+    }
 }
 
-// Parse a function definition.
-fn parse_function(input: &str) -> IResult<Expr> {
-    // Parse the function parameters enclosed in parentheses.
-    let parse_args = delimited(
-        tag("("),
-        separated_list0(tag(","), ws(parse_identifier)),
-        tag(")"),
-    );
-    // Parse the function body enclosed in curly braces.
-    let parse_body = delimited(tag("{"), ws(many0(parse_expr)), tag("}"));
-    // Expect the "fn" keyword, then the function name, parameters, and body.
-    let parser = preceded(
-        tag("fn"),
-        tuple((ws(parse_identifier), parse_args, ws(parse_body))),
-    );
-    map(parser, |(name, args, body)| {
-        Expr::Function(name, args, body)
-    })(input)
+
+/// Main entry function for the parser
+pub fn parser(file: FileIdentifier, input: &[TokenRecord]) -> Result<Vec<Expression>, Box<dyn LError>> {
+    let max_length = input.last().map(|last| last.offset + last.length).unwrap_or(0);
+    final_parser(unit)(input).map_err(|a| to_external_error(a, file, max_length))
 }
 
-// Parse a closure (anonymous function) expression.
-fn parse_closure(input: &str) -> IResult<Expr> {
-    // Parse closure parameters between pipes.
-    let parse_args = delimited(
-        tag("|"),
-        separated_list0(tag(","), ws(parse_identifier)),
-        tag("|"),
-    );
-    // Pair the parsed parameters with a following expression (the closure's body).
-    let parser = pair(parse_args, ws(parse_expr));
-    map(parser, |(args, expr)| Expr::Closure(args, vec![expr]))(input)
+fn to_external_error(internal: ParseError, file: FileIdentifier, max_length: usize) -> Box<dyn LError> {
+    match internal {
+        ParseError::UnexpectedToken { found, expected } => {
+            let message = format!("Unexpected token: {:?}, expected {:?}", found.token_type, expected);
+            Box::new(error::UnexpectedTokenError::new(file, found, message))
+        },
+        ParseError::Eof => {
+            Box::new(error::UnexpectedEndOfFileError::new(file, max_length))
+        }
+        ParseError::Internal { record, kind } => {
+            let message = format!("Error Parsing: {:?}", kind);
+            Box::new(error::UnexpectedTokenError::new(file, record, message))
+        }
+        ParseError::List(list) => {
+            let mut compound = error::ErrorCollection::new();
+            for internal_ in list {
+                compound.add_error(to_external_error(internal_, file, max_length));
+            }
+
+            Box::new(compound)
+        }
+        ParseError::UnexpectedEnd { found } => {
+            let message = "Invalid syntax".to_string();
+            Box::new(error::UnexpectedTokenError::new(file, found, message))
+        }
+    }
 }
 
-// Parse 'if', 'else if', 'else' statements.
-fn parse_if(input: &str) -> IResult<Expr> {
-    // Parse the "if" keyword, condition, and then branch.
-    let (input, _) = tag("if")(input)?;
-    let (input, _) = skip_ws_comments(input)?;
-    let (input, condition) = parse_expr(input)?;
-    let (input, _) = skip_ws_comments(input)?;
-    let (input, then_block) = delimited(tag("{"), ws(many0(parse_expr)), tag("}"))(input)?;
+// <editor-fold desc="Rules">
 
-    // Parse an optional else branch:
-    // It can be either an "else if" chain or a plain "else" block.
-    let (input, else_branch) = opt(preceded(
-        ws(tag("else")),
+fn expression_list(input: &[TokenRecord]) -> IResult<Vec<Expression>> {
+    let (input, expr) = separated_list0(match_token(Token::Comma), expr)(input)?;
+    Ok((input, expr))
+}
+
+fn post_fix(input: &[TokenRecord]) -> IResult<PostFixExpr> {
+    let call = tuple((match_token(Token::LParenthesis), expression_list, match_token(Token::RParenthesis)));
+    let index = tuple((match_token(Token::LBracket), expr, match_token(Token::RBracket)));
+    alt((
+        map(call, |(l, args, r)| PostFixExpr::Call(l.clone(), args)),
+        map(index, |(l, index, r)| PostFixExpr::Index(l.clone(), Box::new(index))),
+    ))(input)
+}
+
+fn factor(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, left) = object(input)?;
+
+    let (input, postfix) = many0(post_fix)(input)?;
+
+    fn apply(expr: PostFixExpr, left: Expression) -> Expression {
+        match expr {
+            PostFixExpr::Call(record, args) =>
+                Expression::Call { region: record, left: Box::new(left), args },
+            PostFixExpr::Index(record, index) =>
+                Expression::Index { region: record, left: Box::new(left), index },
+        }
+    }
+
+    let mut left = left;
+    for post in postfix {
+        left = apply(post, left);
+    }
+
+    let (input, assign) = opt(tuple((
+        match_token(Token::Equals),
+        expr
+    )))(input)?;
+
+    let left = if let Some((l, right)) = assign {
+        Expression::Assignment {
+            region: l.clone(),
+            left: Box::new(left),
+            right: Box::new(right)
+        }
+    } else {
+        left
+    };
+
+    Ok((input, left))
+}
+
+fn unary_expression(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, op) = opt(alt((
+        map(match_token(Token::Minus), |f| (UnaryOperator::Negate, f.clone())),
+        map(match_token(Token::Not), |f| (UnaryOperator::Not, f.clone())),
+    )))(input)?;
+    let (input, expr) = factor(input)?;
+    if let Some(op) = op {
+        Ok((input, Expression::Unary { operator: op.clone(), expr: Box::new(expr) }))
+    } else {
+        Ok((input, expr))
+    }
+
+}
+
+
+fn multiplicative_expression(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, left) = unary_expression(input)?;
+    let (input, right) = opt(tuple((
         alt((
-            // "else if": parse another if expression and wrap it in a vector.
-            map(parse_if, |if_expr| vec![if_expr]),
-            // "else": parse a normal block.
-            delimited(tag("{"), ws(many0(parse_expr)), tag("}"))
-        ))
-    ))(input)?;
-
-    Ok((input, Expr::If(Box::new(condition), then_block, else_branch)))
+            map(match_token(Token::Star), |f| (BinaryOperator::Multiply, f.clone())),
+            map(match_token(Token::RSlash), |f| (BinaryOperator::Divide, f.clone())),
+        )),
+        multiplicative_expression
+    )))(input)?;
+    if let Some((op, right)) = right {
+        Ok((input, Expression::Binary {
+            left: Box::new(left),
+            operator: op,
+            right: Box::new(right)
+        }))
+    } else {
+        Ok((input, left))
+    }
 }
 
-// Parse a for loop.
-fn parse_for(input: &str) -> IResult<Expr> {
-    // Parse the loop variable following the "for" keyword.
-    let parse_name = preceded(tag("for"), ws(parse_identifier));
-    // Parse the collection expression following the "in" keyword.
-    let parse_collection = preceded(tag("in"), ws(parse_expr));
-    // Parse the loop body enclosed in curly braces.
-    let parse_body = delimited(tag("{"), ws(many0(parse_expr)), tag("}"));
-    let parser = tuple((parse_name, parse_collection, parse_body));
-    map(parser, |(name, collection, body)| {
-        Expr::For(name, Box::new(collection), body)
-    })(input)
+fn additive_expression(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, left) = multiplicative_expression(input)?;
+    let (input, right) = opt(tuple((
+        alt((
+            map(match_token(Token::Plus), |f| (BinaryOperator::Add, f.clone())),
+            map(match_token(Token::Minus), |f| (BinaryOperator::Subtract, f.clone())),
+        )),
+        additive_expression
+    )))(input)?;
+    if let Some((op, right)) = right {
+        Ok((input, Expression::Binary {
+            left: Box::new(left),
+            operator: op,
+            right: Box::new(right)
+        }))
+    } else {
+        Ok((input, left))
+    }
 }
 
-// Parse a return statement.
-fn parse_return(input: &str) -> IResult<Expr> {
-    // Expect the "return" keyword followed by an expression.
-    let parser = preceded(tag("return"), ws(parse_expr));
-    map(parser, |expr| Expr::Return(Box::new(expr)))(input)
+fn relational_expression(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, left) = additive_expression(input)?;
+    let (input, right) = opt(tuple((
+        alt((
+            map(match_token(Token::LessThan), |f| (BinaryOperator::LessThan, f.clone())),
+            map(match_token(Token::GreaterThan), |f| (BinaryOperator::GreaterThan, f.clone())),
+            map(match_token(Token::LessThanEquals), |f| (BinaryOperator::LessThanOrEqual, f.clone())),
+            map(match_token(Token::GreaterThanEquals), |f| (BinaryOperator::GreaterThanOrEqual, f.clone())),
+        )),
+        relational_expression
+    )))(input)?;
+    if let Some((op, right)) = right {
+        Ok((input, Expression::Binary {
+            left: Box::new(left),
+            operator: op,
+            right: Box::new(right)
+        }))
+    } else {
+        Ok((input, left))
+    }
 }
 
-// Parse an array literal.
-fn parse_array(input: &str) -> IResult<Expr> {
-    // Parse a list of expressions separated by commas and enclosed in square brackets.
-    let parser = delimited(
-        tag("["),
-        separated_list0(tag(","), ws(parse_expr)),
-        tag("]"),
-    );
-    map(parser, Expr::Array)(input)
+fn equality_expression(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, left) = relational_expression(input)?;
+    let (input, right) = opt(tuple((
+        alt((
+            map(match_token(Token::EqualsEquals), |f| (BinaryOperator::Equal, f.clone())),
+            map(match_token(Token::NotEquals), |f| (BinaryOperator::NotEqual, f.clone())),
+        )),
+        equality_expression
+    )))(input)?;
+    if let Some((op, right)) = right {
+        Ok((input, Expression::Binary {
+            left: Box::new(left),
+            operator: op,
+            right: Box::new(right)
+        }))
+    } else {
+        Ok((input, left))
+    }
 }
 
-// Parse array element access, e.g., name[index].
-fn parse_get(input: &str) -> IResult<Expr> {
-    // Parse the index as a number.
-    let parse_number = map(digit1, |digits: &str| digits.parse::<usize>().unwrap());
-    // Expect the index to be enclosed in square brackets.
-    let parse_index = delimited(tag("["), parse_number, tag("]"));
-    // Pair the variable name with the index.
-    let parser = pair(parse_identifier, parse_index);
-    map(parser, |(name, index)| Expr::Get(name, index))(input)
+
+
+fn conditional_and_expression(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, left) = equality_expression(input)?;
+    let (input, right) = opt(tuple((
+        map(match_token(Token::And), |f| (BinaryOperator::And, f.clone())),
+        conditional_and_expression
+    )))(input)?;
+    if let Some((op, right)) = right {
+        Ok((input, Expression::Binary {
+            left: Box::new(left),
+            operator: op,
+            right: Box::new(right)
+        }))
+    } else {
+        Ok((input, left))
+    }
+}
+fn conditional_or_expression(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, left) = conditional_and_expression(input)?;
+    let (input, right) = opt(tuple((
+        map(match_token(Token::Or), |f| (BinaryOperator::Or, f.clone())),
+        conditional_or_expression
+    )))(input)?;
+    if let Some((op, right)) = right {
+        Ok((input, Expression::Binary {
+            left: Box::new(left),
+            operator: op,
+            right: Box::new(right)
+        }))
+    } else {
+        Ok((input, left))
+    }
 }
 
-fn parse_until(input: &str) -> IResult<Expr> {
-    let (input, _) = tag("until")(input)?;
-    let (input, _) = skip_ws_comments(input)?;
-    let (input, condition) = parse_expr(input)?;
-    let (input, _) = skip_ws_comments(input)?;
-    let (input, body) = delimited(tag("{"), ws(many0(parse_expr)), tag("}"))(input)?;
-    Ok((input, Expr::Until(Box::new(condition), body)))
+fn array(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::LBracket)(input)?;
+    let (input, expr) = separated_list0(match_token(Token::Comma), expr)(input)?;
+    let (input, _) = match_token(Token::RBracket)(input)?;
+    Ok((input, Expression::Array(expr)))
 }
 
-// parse_factor: a number, a boolean, a string, a name, or a parenthesized expression.
-fn parse_factor(input: &str) -> IResult<Expr> {
+fn closure(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::Bar)(input)?;
+    let (input, args) = separated_list0(match_token(Token::Comma), match_token(Token::Identifier))(input)?;
+    let (input, _) = match_token(Token::Bar)(input)?;
+    let (input, block) = block(input)?;
+    Ok((input, Expression::Closure { args: args.into_iter().cloned().collect(), block }))
+}
+
+fn object(input: &[TokenRecord]) -> IResult<Expression> {
     alt((
-        // Allow parenthesized expressions.
-        delimited(tag("("), ws(parse_expr), tag(")")),
-        // Otherwise, use an existing parser that produces a constant or a variable.
-        parse_constant,
+        array,
+        closure,
+        map(match_token(Token::String), |r| Expression::String(r.clone())),
+        map(match_token(Token::Integer), |r| Expression::Integer(r.clone())),
+        map(match_token(Token::Float), |r| Expression::Float(r.clone())),
+        map(match_token(Token::Boolean), |r| Expression::Bool(r.clone())),
+        map(match_token(Token::Identifier), |r| Expression::Identifier(r.clone())),
+        delimited(match_token(Token::LParenthesis), expr, match_token(Token::RParenthesis)),
     ))(input)
 }
 
-// parse_term: handle multiplication and division.
-fn parse_term(input: &str) -> IResult<Expr> {
-    let (input, init) = parse_factor(input)?;
-    fold_many0(
-        pair(ws(alt((tag("*"), tag("/")))), parse_factor),
-        || init.clone(),
-        |acc, (op, value)| {
-            let bin_op = match op {
-                "*" => BinOp::Mul,
-                "/" => BinOp::Div,
-                _   => unreachable!(),
-            };
-            Expr::Binary(Box::new(acc), bin_op, Box::new(value))
-        }
-    )(input)
+
+fn let_statement(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::Let)(input)?;
+    let (input, id) = cut(match_token(Token::Identifier))(input)?;
+    let (input, _) = cut(match_token(Token::Equals))(input)?;
+    let (input, expr) = cut(expr)(input)?;
+    Ok((input, Expression::Let { id: id.clone(), expr: Box::new(expr) }))
 }
 
-// parse_add_sub: handle addition and subtraction.
-fn parse_add_sub(input: &str) -> IResult<Expr> {
-    let (input, init) = parse_term(input)?;
-    fold_many0(
-        pair(ws(alt((tag("+"), tag("-")))), parse_term),
-        || init.clone(),
-        |acc, (op, value)| {
-            let bin_op = match op {
-                "+" => BinOp::Add,
-                "-" => BinOp::Sub,
-                _   => unreachable!(),
-            };
-            Expr::Binary(Box::new(acc), bin_op, Box::new(value))
-        }
-    )(input)
+fn if_statement(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::If)(input)?;
+    let (input, expr_) = expr(input)?;
+    let (input, block_) = block(input)?;
+    //there might be a better way than to throw away the first token of the tuple
+    let (input, else_block) = opt(tuple((
+        match_token(Token::Else),
+        alt((block, map(expr, |e| vec![e])))
+    )))(input)?;
+    Ok((input, Expression::If {
+        expr: Box::new(expr_),
+        block: block_,
+        else_block: else_block.map(|(_, vec)| vec)
+    }))
 }
 
 
-// parse_arithmetic: our top-level arithmetic parser.
-fn parse_arithmetic(input: &str) -> IResult<Expr> {
-    parse_add_sub(input)
+fn until(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::Until)(input)?;
+    let (input, expr) = expr(input)?;
+    let (input, block) = block(input)?;
+    Ok((input, Expression::Until {
+        expr: Box::new(expr),
+        block
+    }))
 }
 
-fn parse_include(input: &str) -> IResult<Expr> {
-    // "include" keyword followed by whitespace and a library name
-    let (input, _) = tag("include")(input)?;
-    let (input, _) = ws(nom::combinator::success(()))(input)?;
-    let (input, lib_name) = parse_identifier(input)?;
-    Ok((input, Expr::Include(lib_name)))
+fn for_loop(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::For)(input)?;
+    let (input, id) = match_token(Token::Identifier)(input)?;
+    let (input, _) = match_token(Token::In)(input)?;
+    let (input, expr) = expr(input)?;
+    let (input, block) = block(input)?;
+    Ok((input, Expression::For {
+        id: id.clone(),
+        expr: Box::new(expr),
+        block
+    }))
 }
 
-// Parse any expression by trying each possibility in order.
-fn parse_expr(input: &str) -> IResult<Expr> {
+fn function(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::Fn)(input)?;
+    let (input, id) = match_token(Token::Identifier)(input)?;
+    let (input, _) = match_token(Token::LParenthesis)(input)?;
+    let (input, args) = separated_list0(match_token(Token::Comma), match_token(Token::Identifier))(input)?;
+    let (input, _) = match_token(Token::RParenthesis)(input)?;
+    let (input, block) = block(input)?;
+    Ok((input, Expression::Function {
+        id: id.clone(),
+        args: args.into_iter().cloned().collect(),
+        block
+    }))
+}
+
+fn return_statement(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::Return)(input)?;
+    let (input, expr) = expr(input)?;
+    Ok((input, Expression::Return { expr: Box::new(expr) }))
+}
+
+fn include(input: &[TokenRecord]) -> IResult<Expression> {
+    let (input, _) = match_token(Token::Include)(input)?;
+    let (input, id) = match_token(Token::Identifier)(input)?;
+    Ok((input, Expression::Include { id: id.clone() } ))
+}
+
+fn expr(input: &[TokenRecord]) -> IResult<Expression> {
     alt((
-        parse_include,
-        parse_return,
-        parse_function,
-        parse_for,
-        parse_until,
-        parse_if,
-        parse_let,
-        parse_compare,
-        parse_array,
-        parse_closure,
-        parse_get,
-        parse_call,
-        parse_arithmetic,
-        parse_constant,
+        include,
+        return_statement,
+        function,
+        for_loop,
+        until,
+        if_statement,
+        let_statement,
+        conditional_or_expression
     ))(input)
 }
 
-// Parse interpolation within strings for embedding expressions.
-// It returns a list of expressions that are either literal strings or parsed expressions.
-pub fn parse_interpolation(input: &str) -> IResult<Vec<Expr>> {
-    // Parse expressions within curly braces.
-    let parse_braces = delimited(tag("{"), ws(parse_expr), tag("}"));
-    // Parse text segments that are not part of an interpolation.
-    let parse_string = map(is_not("{"), |string: &str| {
-        Expr::Constant(Atom::String(string.to_string()))
-    });
-    many0(alt((parse_braces, parse_string)))(input)
+fn block(input: &[TokenRecord]) -> IResult<Vec<Expression>> {
+    let (input, _) = match_token(Token::LBrace)(input)?;
+    let (input, expr) = many0(expr)(input)?;
+    let (input, _) = match_token(Token::RBrace)(input)?;
+    Ok((input, expr))
 }
 
-// The final parser function that ties all the sub-parsers together.
-// It applies the expression parser repeatedly until the entire input is consumed.
-pub fn parser(input: &str) -> Result<Vec<Expr>, ErrorTree<&str>> {
-    final_parser(many0(ws(parse_expr)))(input)
+fn unit(input: &[TokenRecord]) -> IResult<Vec<Expression>> {
+    many0(expr)(input)
 }
+
+// </editor-fold>

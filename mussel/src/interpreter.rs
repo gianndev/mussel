@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
 // Import definitions from the parser module that are needed for evaluation.
-use crate::parser::{Atom, BinOp, Expr, Operator, parse_interpolation};
 use core::panic;
 // Import the HashMap collection to maintain variable bindings.
 use std::collections::HashMap;
+use crate::expr::{Atom, BinOp, Expr, Operator};
 
 // The main interpreter function that takes a vector of expressions.
 pub fn interpreter(exprs: Vec<Expr>) {
@@ -27,35 +27,82 @@ fn interpreter_expr(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         // For a return expression, evaluate the inner expression and re-wrap it.
         Expr::Return(expr) => Expr::Return(Box::new(interpreter_expr(*expr, context))),
         // If the expression is a string constant, attempt to parse interpolation.
-        Expr::Constant(Atom::String(ref string)) => match parse_interpolation(string) {
-            Ok((_, exprs)) => {
-                // If there is zero or one interpolated expression, leave it unchanged.
-                match exprs.len() {
-                    0 | 1 => return expr,
-                    _ => {
-                        // Otherwise, create an output string and evaluate each interpolated expression.
-                        let mut output = String::with_capacity(string.len());
-                        for mut expr in exprs {
-                            // Continue evaluating until the expression no longer changes.
-                            loop {
-                                let new_expr = interpreter_expr(expr.clone(), context);
-                                if expr == new_expr {
-                                    break;
+        Expr::Constant(Atom::String(ref string)) => {
+            let mut result = string.clone();
+            let mut start = 0;
+
+            while let Some(open) = result[start..].find('{') {
+                if let Some(close) = result[start + open..].find('}') {
+                    let placeholder = &result[start + open + 1..start + open + close];
+                    let value = if placeholder.contains('[') {
+                        // Handle array access like `fruits[1]`
+                        let parts: Vec<&str> = placeholder.split('[').collect();
+                        if parts.len() == 2 {
+                            let array_name = parts[0];
+                            let index_str = parts[1].trim_end_matches(']');
+                            if let Ok(index) = index_str.parse::<usize>() {
+                                if let Some(Expr::Array(items)) = context.get(array_name) {
+                                    if let Some(item) = items.get(index) {
+                                        item.to_string()
+                                    } else {
+                                        format!("{{{placeholder}}}")
+                                    }
                                 } else {
-                                    expr = new_expr;
+                                    format!("{{{placeholder}}}")
                                 }
+                            } else {
+                                format!("{{{placeholder}}}")
                             }
-                            // Append the evaluated expression's string representation.
-                            output.push_str(&expr.to_string());
+                        } else {
+                            format!("{{{placeholder}}}")
                         }
-                        // Return a new constant with the fully interpolated string.
-                        return Expr::Constant(Atom::String(output));
-                    }
+                    } else if placeholder.contains(' ') {
+                        // Handle arithmetic expressions like `end - start`
+                        let tokens: Vec<&str> = placeholder.split_whitespace().collect();
+                        if tokens.len() == 3 {
+                            let left = tokens[0];
+                            let operator = tokens[1];
+                            let right = tokens[2];
+
+                            if let (Some(Expr::Constant(Atom::Number(left_val))),
+                                    Some(Expr::Constant(Atom::Number(right_val)))) =
+                                (context.get(left), context.get(right)) {
+                                match operator {
+                                    "+" => (left_val + right_val).to_string(),
+                                    "-" => (left_val - right_val).to_string(),
+                                    "*" => (left_val * right_val).to_string(),
+                                    "/" => {
+                                        if *right_val == 0 {
+                                            "Division by zero".to_string()
+                                        } else {
+                                            (left_val / right_val).to_string()
+                                        }
+                                    },
+                                    _ => format!("{{{placeholder}}}"),
+                                }
+                            } else {
+                                format!("{{{placeholder}}}")
+                            }
+                        } else {
+                            format!("{{{placeholder}}}")
+                        }
+                    } else {
+                        // Handle simple variable interpolation
+                        context.get(placeholder).map_or_else(
+                            || format!("{{{placeholder}}}"),
+                            |expr| expr.to_string(),
+                        )
+                    };
+
+                    result.replace_range(start + open..start + open + close + 1, &value);
+                    start += open + value.len();
+                } else {
+                    break;
                 }
             }
-            // If interpolation parsing fails, return the original expression.
-            _ => expr,
-        },
+
+            Expr::Constant(Atom::String(result))
+        }
         // If the constant is a name, look it up in the context.
         Expr::Constant(ref atom) => match atom {
             Atom::Name(name) => context

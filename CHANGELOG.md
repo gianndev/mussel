@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 (2025-05-06)
+- Major change at the low level to how Mussel handles code
+- Added a file dedicated to the lexer
+- Improved the parser
+- Added multi-line comments
+- Improved `Tutorial.md` file
+- Fixed a missing string interpolation management in the interpreter
+
 ## 0.2.0 (2025-04-22)
 - Added ability to use `_` in variable and function names (Snake case can now be used in addition to Camel case)
 - Added the `time` library to the Standard Library

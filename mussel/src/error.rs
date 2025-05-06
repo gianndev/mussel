@@ -10,6 +10,7 @@ use codespan_reporting::{
     term,
 };
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use crate::lexer::{TokenRecord};
 
 /// Represents a set of files and their content.
 /// Only one of these should exist at a time.
@@ -117,6 +118,9 @@ pub trait LError {
     fn report(&self) -> Vec<Diagnostic<usize>>;
 }
 
+pub fn boxed<E: LError + 'static>(err: E) -> Box<dyn LError> {
+    Box::new(err)
+}
 
 /// Creates a code label for a specific source location.
 fn label(file: FileIdentifier, range: Range<usize>) -> Label<usize> {
@@ -179,6 +183,108 @@ impl LError for FileError {
         let diagnostic = Diagnostic::error()
             .with_message(self.message.clone())
             .with_notes(vec![format!("File: {}", self.path)]);
+        vec![diagnostic]
+    }
+}
+
+
+pub struct TokenError {
+    file: FileIdentifier,
+    index: usize
+}
+impl TokenError {
+    pub fn new(file: FileIdentifier, index: usize) -> Self {
+        TokenError { file, index }
+    }
+}
+
+impl LError for TokenError {
+    fn report(&self) -> Vec<Diagnostic<usize>> {
+        let diagnostic = Diagnostic::error().with_message("Unknown symbol");
+        vec![
+            diagnostic.with_labels(vec![
+                label(self.file, self.index..self.index + 1),
+            ])
+        ]
+    }
+}
+
+
+pub struct UnexpectedTokenError {
+    file: FileIdentifier,
+    record: TokenRecord,
+    message: String,
+}
+
+
+impl UnexpectedTokenError {
+    pub fn new(file: FileIdentifier, record: TokenRecord, message: String) -> Self {
+        UnexpectedTokenError {
+            file,
+            record,
+            message,
+        }
+    }
+}
+
+impl LError for UnexpectedTokenError {
+    fn report(&self) -> Vec<Diagnostic<usize>> {
+        let diagnostic = Diagnostic::error()
+            .with_message(self.message.clone())
+            .with_labels(vec![
+                label(self.file, self.record.range()),
+            ]);
+        vec![diagnostic]
+    }
+}
+
+pub struct UnexpectedEndOfFileError {
+    file: FileIdentifier,
+    index: usize,
+}
+impl UnexpectedEndOfFileError {
+    pub fn new(file: FileIdentifier, index: usize) -> Self {
+        UnexpectedEndOfFileError {
+            file,
+            index,
+        }
+    }
+}
+
+impl LError for UnexpectedEndOfFileError {
+    fn report(&self) -> Vec<Diagnostic<usize>> {
+        let diagnostic = Diagnostic::error()
+            .with_message("Unexpected end of file")
+            .with_labels(vec![
+                label(self.file, self.index-1..self.index),
+            ]);
+        vec![diagnostic]
+    }
+}
+
+
+pub struct NotSupportedOperationError {
+    file: FileIdentifier,
+    record: TokenRecord,
+    message: String,
+}
+impl NotSupportedOperationError {
+    pub fn new(file: FileIdentifier, record: TokenRecord, message: String) -> Self {
+        NotSupportedOperationError {
+            file,
+            record,
+            message,
+        }
+    }
+}
+
+impl LError for NotSupportedOperationError {
+    fn report(&self) -> Vec<Diagnostic<usize>> {
+        let diagnostic = Diagnostic::error()
+            .with_message(self.message.clone())
+            .with_labels(vec![
+                label(self.file, self.record.range()),
+            ]);
         vec![diagnostic]
     }
 }

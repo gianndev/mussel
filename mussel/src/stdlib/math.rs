@@ -1,8 +1,8 @@
 // Copyright (c) 2025 Francesco Giannice
 // Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 
-use crate::parser::{Atom, Expr};
 use std::collections::HashMap;
+use crate::expr::{Atom, Expr};
 
 // Loads math-related built-ins into the context.
 pub fn load(context: &mut HashMap<String, Expr>) {
