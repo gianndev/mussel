@@ -1,6 +1,6 @@
 # Changelog
 
-## x.x.x (xxxx-xx-xx)
+## 0.2.1 (2025-05-06)
 - Major change at the low level to how Mussel handles code
 - Added a file dedicated to the lexer
 - Improved the parser
