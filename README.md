@@ -8,7 +8,7 @@
 
 ## Why should I choose Mussel?
 
-Mussel's interpreter is programmed in Rust, which means that Mussel offers the same advantages as Rust such as **code execution speed** and **security**. In addition, **Mussel's syntax is extremely simple**, comparable to Python's. This union makes Mussel like a language "*safe and fast like Rust and easy to use like Python*".
+Mussel's interpreter is programmed in Rust, which means **code execution speed** and **security** with the interpreter. In addition, **Mussel's syntax is extremely simple**, comparable to Python's. This union makes Mussel like a language "*safe and fast like Rust and easy to use like Python*".
 
 ## Tutorial
 
